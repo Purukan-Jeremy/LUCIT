@@ -1,4 +1,14 @@
+import { useNavigate } from "react-router-dom";
+// Pastikan CSS Hero sudah terhubung (biasanya via global style.css)
+
 function Hero() {
+  const navigate = useNavigate();
+
+  const handleStartDetection = () => {
+    // Ini memerintahkan website pindah ke url /analysis
+    navigate("/analysis");
+  };
+
   return (
     <main className="hero" id="home">
       <div className="hero-content">
@@ -12,7 +22,10 @@ function Hero() {
           Histopathology Classification and Segmentation
         </p>
 
-        <button className="primary-btn">Start Detection</button>
+        {/* Tambahkan event onClick di sini */}
+        <button className="primary-btn" onClick={handleStartDetection}>
+          Start Detection
+        </button>
       </div>
     </main>
   );
