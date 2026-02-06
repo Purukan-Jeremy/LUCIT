@@ -14,7 +14,8 @@ function Header() {
       </nav>
 
       <button className="user-icon" aria-label="User profile">
-        <span>👤</span>
+        <span className="icon">👤</span>
+        <span className="login-text">Login</span>
       </button>
     </header>
   );
