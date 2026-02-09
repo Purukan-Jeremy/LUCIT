@@ -1,0 +1,66 @@
+.splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: bgTransform 4s forwards ease-in-out;
+}
+
+.splash-content {
+  text-align: center;
+}
+
+.splash-text {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #fff;
+  opacity: 0;
+  animation: textFade 4s forwards ease-in-out;
+  letter-spacing: 0.05em;
+}
+
+@keyframes bgTransform {
+  0% {
+    background-color: #000;
+  }
+  50% {
+    background-color: #000;
+  }
+  100% {
+    background-color: #fff;
+  }
+}
+
+@keyframes textFade {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+    color: #fff;
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0);
+    color: #fff;
+  }
+  70% {
+    opacity: 1;
+    color: #fff;
+  }
+  100% {
+    opacity: 0;
+    color: #000;
+  }
+}
+
+.splash-screen.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 1s ease-out, visibility 1s;
+}
