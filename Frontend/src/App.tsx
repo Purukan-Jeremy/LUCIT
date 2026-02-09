@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
-import AnalysisPage from "./pages/analysis"; // Pastikan path ini sesuai struktur folder Anda
+import Footer from "./components/Footer";
+import AnalysisPage from "./pages/analysis";
 import SplashScreen from "./components/SplashScreen";
 
 function App() {
@@ -33,6 +34,8 @@ function App() {
             {/* Halaman Analysis (Tujuan saat tombol ditekan) */}
             <Route path="/analysis" element={<AnalysisPage />} />
           </Routes>
+
+          <Footer />
         </>
       )}
     </Router>
