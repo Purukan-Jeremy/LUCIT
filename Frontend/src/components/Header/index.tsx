@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 function Header() {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <header className="site-header">
       <div className="logo">
@@ -8,12 +11,32 @@ function Header() {
         <span className="logo-cit">CIT</span>
       </div>
 
-      <nav className="nav-links">
-        <Link to="/">Home</Link>
-        <a href="#about">About</a>
-        <a href="#contact">Contact Us</a>
-        <a href="#history">History</a>
+      <nav className={`nav-links ${menuOpen ? "open" : ""}`}>
+        <Link to="/#home" onClick={() => setMenuOpen(false)}>
+          Home
+        </Link>
+        <Link to="/#about" onClick={() => setMenuOpen(false)}>
+          About
+        </Link>
+        <Link to="/#contact" onClick={() => setMenuOpen(false)}>
+          Contact Us
+        </Link>
+        <Link to="/#history" onClick={() => setMenuOpen(false)}>
+          History
+        </Link>
       </nav>
+
+      <button
+        className="burger"
+        type="button"
+        aria-label="Toggle navigation"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((open) => !open)}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
 
       <button className="user-icon" aria-label="User profile">
         <span className="icon">👤</span>

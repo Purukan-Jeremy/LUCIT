@@ -95,6 +95,29 @@ button {
   color: var(--pink);
 }
 
+.burger {
+  display: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 6px;
+  margin-right: 0;
+  margin-left: auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.burger span {
+  display: block;
+  width: 24px;
+  height: 3px;
+  background: #444;
+  border-radius: 999px;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
 .user-icon {
   height: 36px;
   width: 36px;
@@ -151,6 +174,7 @@ button {
   padding-top: 72px; /* offset header */
   position: relative;
   overflow: hidden;
+  scroll-margin-top: 72px;
 }
 
 .hero::before {
@@ -324,7 +348,33 @@ button {
   }
 
   .nav-links {
-    display: none; /* sembunyikan menu di layar kecil, fokus ke hero */
+    position: absolute;
+    top: 72px;
+    right: 16px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.12);
+    padding: 14px 16px;
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    z-index: 20;
+  }
+
+  .nav-links.open {
+    display: flex;
+  }
+
+  .burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .user-icon {
+    margin-left: 8px;
   }
 
   .hero-title {
@@ -357,7 +407,7 @@ button {
 
 .analysis-container {
   min-height: 100vh;
-  padding: 88px 12px 32px;
+  padding: 88px 12px 520px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -520,7 +570,7 @@ button {
   background: var(--pink);
   min-height: 250px;
   padding-bottom: 2rem;
-  margin-top: 15rem;
+  margin-top: 0;
   width: 100vw;
   margin-left: calc(50% - 50vw);
 }
@@ -615,6 +665,116 @@ button {
 @media (max-width: 600px) {
   .footer-content {
     text-align: center;
+  }
+}
+
+/* Contact Us */
+.contact-section {
+  background-color: var(--purple);
+  padding: 90px 0 520px;
+  color: #fff;
+  scroll-margin-top: 72px;
+}
+
+.contact-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 80px;
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 100px;
+  align-items: center;
+}
+
+.contact-title {
+  font-size: 36px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.contact-subtitle {
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 420px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+
+.contact-form {
+  display: grid;
+  gap: 18px;
+}
+
+.contact-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.contact-field {
+  display: grid;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.contact-field span {
+  color: #fff;
+}
+
+.contact-field input,
+.contact-field textarea {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background-color: #fff;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-family: inherit;
+  color: #2b2b2b;
+  outline: none;
+}
+
+.contact-field textarea {
+  min-height: 130px;
+  resize: vertical;
+}
+
+.contact-submit {
+  height: 44px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  background: transparent;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.contact-submit:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+@media (max-width: 900px) {
+  .contact-container {
+    grid-template-columns: 1fr;
+    gap: 40px;
+    padding: 0 32px;
+  }
+
+  .contact-subtitle {
+    max-width: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .contact-section {
+    padding: 70px 0 640px;
+  }
+
+  .contact-row {
+    grid-template-columns: 1fr;
   }
 }
 .splash-screen {
