@@ -2,21 +2,65 @@ import React, { useEffect, useState } from "react";
 import "../../assets/style.css";
 
 const SplashScreen: React.FC = () => {
-  const [isVisible, setIsVisible] = useState(true);
+  const [isAnimating, setIsAnimating] = useState(true);
+  const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsVisible(false);
-    }, 4500); // Wait for the animation to finish (4s + some buffer)
+    // Start fading out the content
+    const animationTimer = setTimeout(() => {
+      setIsAnimating(false);
+    }, 4500);
 
-    return () => clearTimeout(timer);
+    // Remove component from DOM after fade out transition
+    const mountTimer = setTimeout(() => {
+      setIsMounted(false);
+    }, 5500);
+
+    return () => {
+      clearTimeout(animationTimer);
+      clearTimeout(mountTimer);
+    };
   }, []);
 
-  if (!isVisible) return null;
+  if (!isMounted) return null;
 
   return (
-    <div className={`splash-screen ${!isVisible ? "fade-out" : ""}`}>
+    <div className={`splash-screen ${!isAnimating ? "fade-out" : ""}`}>
       <div className="splash-content">
+        <div className="svg-container">
+          <svg
+            viewBox="0 0 1000 200"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="motion-line"
+            preserveAspectRatio="none"
+          >
+            <path
+              d="M-50 120 Q 250 20, 500 120 T 1050 120"
+              stroke="url(#gradient1)"
+              strokeWidth="6"
+              strokeLinecap="round"
+              className="flowing-path path-1"
+            />
+            <path
+              d="M-50 80 Q 250 180, 500 80 T 1050 80"
+              stroke="url(#gradient2)"
+              strokeWidth="4"
+              strokeLinecap="round"
+              className="flowing-path path-2"
+            />
+            <defs>
+              <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#e91e63" />
+                <stop offset="100%" stopColor="#6a1b9a" />
+              </linearGradient>
+              <linearGradient id="gradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#6a1b9a" />
+                <stop offset="100%" stopColor="#e91e63" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
         <h1 className="splash-text">Welcome To LUCIT Your Histopathology AI</h1>
       </div>
     </div>
