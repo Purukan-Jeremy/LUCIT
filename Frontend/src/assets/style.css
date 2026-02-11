@@ -427,24 +427,25 @@ button {
   display: grid;
   grid-template-columns: 1fr 1.05fr;
   background: #ffffff;
-  border-radius: 28px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.06);
+  border: 2px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.08);
 }
 
 /* LEFT PANEL */
 .card-left {
-  background: var(--pink);
-  color: #ffffff;
-  padding: 96px 96px;
+  background: #fbf8fb;
+  color: #333333;
+  padding: 64px 96px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 20px;
 }
 
-.card-left h2 {
+.card-left h2,
+.card-right h2 {
   font-size: 32px;
   font-weight: 700;
   text-align: center;
@@ -454,34 +455,38 @@ button {
 .steps-list {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  max-width: 440px;
-  margin: 0 auto;
+  gap: 26px;
+  width: 100%;
+  max-width: 560px;
+  margin: 0;
 }
 
 .step-item h3 {
   font-size: 22px;
   font-weight: 700;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   letter-spacing: 0.2px;
+  line-height: 1.25;
 }
 
 .step-item p {
-  font-size: 16.5px;
-  line-height: 1.65;
-  opacity: 0.9;
-  max-width: 420px;
+  font-size: 16px;
+  line-height: 1.55;
+  opacity: 0.96;
+  max-width: none;
 }
 
-/* RIGHT PANEL */
+/* ANALYSIS - RIGHT PANEL */
 .card-right {
-  background: #fbf8fb;
-  padding: 96px 96px;
+  background: var(--pink);
+  color: #ffffff;
+  padding: 52px 56px;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
-  gap: 22px;
+  gap: 14px;
+  border-left: 2px solid rgba(255, 255, 255, 0.4);
 }
 
 .upload-title {
@@ -489,8 +494,99 @@ button {
   font-weight: 600;
   text-align: center;
   color: #3b3b3b;
-  max-width: 460px;
+  width: 100%;
+  max-width: 420px;
   line-height: 1.3;
+  margin: 0 auto 14px;
+}
+
+/* ANALYSIS - HOW IT WORKS TEXT */
+.card-right h2 {
+  margin-bottom: 12px;
+  margin-top: auto;
+}
+
+.card-right .steps-list {
+  gap: 34px;
+  max-width: 420px;
+  margin: 0 auto auto;
+}
+
+.card-right .step-item h3 {
+  margin-bottom: 12px;
+}
+
+.card-right .step-item p {
+  line-height: 1.65;
+}
+
+.analysis-result {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-summary-card,
+.result-description-card {
+  border: 1.5px solid rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.result-summary-card {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 18px 20px;
+}
+
+.result-preview {
+  width: 190px;
+  height: 190px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.result-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.result-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-metrics p {
+  font-size: 24px;
+  font-weight: 500;
+  margin: 0;
+  color: #ffffff;
+}
+
+.result-description-card {
+  min-height: 260px;
+  padding: 18px 20px;
+}
+
+.result-description-card h3 {
+  margin: 0 0 10px;
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.result-description-card p {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .model-select {
@@ -522,17 +618,18 @@ button {
 .upload-box {
   width: min(720px, 100%);
   height: 460px;
-  border: 3px dashed #1e1e1e;
-  border-radius: 28px;
+  border: 3px dashed #111111;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   transition: background 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
 }
 
 .upload-box:hover {
-  background: rgba(0, 0, 0, 0.02);
+  background: rgba(0, 0, 0, 0.03);
 }
 
 .upload-label {
@@ -554,6 +651,12 @@ button {
   min-width: 220px;
 }
 
+.start-analysis-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 @media (max-width: 900px) {
   .analysis-card {
     grid-template-columns: 1fr;
@@ -561,11 +664,34 @@ button {
 
   .card-left,
   .card-right {
-    padding: 56px 36px;
+    padding: 42px 30px;
   }
 
   .upload-box {
     height: 320px;
+  }
+
+  .result-summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .result-preview {
+    width: 100%;
+    max-width: 220px;
+    height: 180px;
+  }
+
+  .result-metrics p {
+    font-size: 18px;
+  }
+
+  .result-description-card h3 {
+    font-size: 24px;
+  }
+
+  .result-description-card p {
+    font-size: 16px;
   }
 }
 
