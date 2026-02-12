@@ -5,13 +5,8 @@ import LoginModal from "../LoginModal";
 function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
-  const openLoginModal = () => {
-    setIsLoginModalOpen(true);
-  };
-
-  const closeLoginModal = () => {
-    setIsLoginModalOpen(false);
-  };
+  const openLoginModal = () => setIsLoginModalOpen(true);
+  const closeLoginModal = () => setIsLoginModalOpen(false);
 
   return (
     <>
@@ -28,8 +23,8 @@ function Header() {
           <a href="#history">History</a>
         </nav>
 
-        <button 
-          className="user-icon" 
+        <button
+          className="user-icon"
           aria-label="User profile"
           onClick={openLoginModal}
         >

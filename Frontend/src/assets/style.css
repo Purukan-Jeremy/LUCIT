@@ -922,7 +922,19 @@ button {
   align-items: center;
   justify-content: center;
   z-index: 9999;
-  animation: bgTransform 4s forwards ease-in-out;
+  opacity: 1;
+  will-change: opacity;
+}
+
+.app-shell {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.7s ease;
+}
+
+.app-shell.app-shell-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .splash-content {
@@ -1006,18 +1018,6 @@ button {
   }
 }
 
-@keyframes bgTransform {
-  0% {
-    background-color: #000;
-  }
-  70% {
-    background-color: #000;
-  }
-  100% {
-    background-color: #f7f4f9;
-  }
-}
-
 @keyframes textFade {
   0% {
     opacity: 0;
@@ -1040,7 +1040,9 @@ button {
 .splash-screen.fade-out {
   opacity: 0;
   visibility: hidden;
-  transition: opacity 1s ease-out, visibility 1s;
+  transition:
+    opacity 1.2s cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 1.2s;
 }
 
 /* =========================================

@@ -27,8 +27,7 @@ const AnalysisPage: React.FC = () => {
   };
 
   const handleStartAnalysis = () => {
-    if (!selectedImage || !selectedPreview || modelType !== "classification")
-      return;
+    if (!selectedImage || !selectedPreview || modelType === "none") return;
     setResultPreview(selectedPreview);
     setIsAnalyzed(true);
     setSelectedImage(null);
@@ -101,7 +100,7 @@ const AnalysisPage: React.FC = () => {
           <button
             className="primary-btn start-analysis-btn"
             onClick={handleStartAnalysis}
-            disabled={!selectedImage || modelType !== "classification"}
+            disabled={!selectedImage || modelType === "none"}
           >
             Start Analysis
           </button>
@@ -112,16 +111,11 @@ const AnalysisPage: React.FC = () => {
             </p>
           )}
 
-          {modelType === "segmentation" && (
-            <p style={{ color: "#666", fontSize: "0.9rem" }}>
-              Dummy result saat ini hanya untuk model classification.
-            </p>
-          )}
         </div>
 
         {/* BAGIAN KANAN (HOW IT WORKS) */}
         <div className="card-right">
-          {isAnalyzed && modelType === "classification" ? (
+          {isAnalyzed && modelType !== "none" ? (
             <div className="analysis-result">
               <div className="result-summary-card">
                 <div className="result-preview">

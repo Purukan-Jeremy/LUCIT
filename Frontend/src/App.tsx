@@ -26,45 +26,51 @@ function ScrollHandler() {
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
+  const [showApp, setShowApp] = useState(false);
 
   useEffect(() => {
-    // Splash screen will be handled by its own internal timer for animation
-    // But we remove it from DOM after it's done
-    const timer = setTimeout(() => {
-      setShowSplash(false);
-    }, 5000); // Slightly longer than the animation duration in CSS
+    // Reveal app content slightly before splash fully disappears
+    const appTimer = setTimeout(() => {
+      setShowApp(true);
+    }, 4300);
 
-    return () => clearTimeout(timer);
+    // Remove splash after fade-out transition completes
+    const splashTimer = setTimeout(() => {
+      setShowSplash(false);
+    }, 5600);
+
+    return () => {
+      clearTimeout(appTimer);
+      clearTimeout(splashTimer);
+    };
   }, []);
 
   return (
     <Router>
       <ScrollHandler />
       {showSplash && <SplashScreen />}
-      {!showSplash && (
-        <>
-          {/* Header ditaruh di luar Routes agar selalu muncul di semua halaman */}
-          <Header />
+      <div className={`app-shell ${showApp ? "app-shell-visible" : ""}`}>
+        {/* Header ditaruh di luar Routes agar selalu muncul di semua halaman */}
+        <Header />
 
-          <Routes>
-            {/* Halaman Utama (Home) */}
-            <Route
-              path="/"
-              element={
-                <>
-                  <Hero />
-                  <ContactUs />
-                </>
-              }
-            />
+        <Routes>
+          {/* Halaman Utama (Home) */}
+          <Route
+            path="/"
+            element={
+              <>
+                <Hero />
+                <ContactUs />
+              </>
+            }
+          />
 
-            {/* Halaman Analysis (Tujuan saat tombol ditekan) */}
-            <Route path="/analysis" element={<AnalysisPage />} />
-          </Routes>
+          {/* Halaman Analysis (Tujuan saat tombol ditekan) */}
+          <Route path="/analysis" element={<AnalysisPage />} />
+        </Routes>
 
-          <Footer />
-        </>
-      )}
+        <Footer />
+      </div>
     </Router>
   );
 }
