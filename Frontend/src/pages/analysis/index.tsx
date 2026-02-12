@@ -287,7 +287,7 @@ const AnalysisPage: React.FC = () => {
                     whiteSpace: "pre-wrap",
                     lineHeight: "1.8",
                     textAlign: "justify",
-                    color: "#333",
+                    color: "rgba(255, 255, 255, 0.95)",
                   }}
                 >
                   {predictionResult?.ai_description ||
@@ -299,6 +299,7 @@ const AnalysisPage: React.FC = () => {
                     marginTop: "1rem",
                     padding: "0.75rem",
                     backgroundColor: "#fff3cd",
+                    color: "#000",
                     borderLeft: "4px solid #ffc107",
                     borderRadius: "4px",
                   }}

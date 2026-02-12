@@ -484,7 +484,7 @@ button {
 
 /* ANALYSIS - RIGHT PANEL */
 .card-right {
-  background: var(--pink);
+  background: #6a1b9a;
   color: #ffffff;
   padding: 52px 56px;
   display: flex;

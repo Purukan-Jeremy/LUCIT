@@ -14,22 +14,41 @@ function ContactUs() {
           <div className="contact-row">
             <label className="contact-field">
               <span>First name</span>
-              <input type="text" name="firstName" autoComplete="given-name" />
+              <input
+                type="text"
+                name="firstName"
+                autoComplete="given-name"
+                placeholder="Enter your first name"
+              />
             </label>
             <label className="contact-field">
               <span>Last name</span>
-              <input type="text" name="lastName" autoComplete="family-name" />
+              <input
+                type="text"
+                name="lastName"
+                autoComplete="family-name"
+                placeholder="Enter your last name"
+              />
             </label>
           </div>
 
           <label className="contact-field">
             <span>Email</span>
-            <input type="email" name="email" autoComplete="email" />
+            <input
+              type="email"
+              name="email"
+              autoComplete="email"
+              placeholder="name@example.com"
+            />
           </label>
 
           <label className="contact-field">
             <span>Message</span>
-            <textarea name="message" rows={5} />
+            <textarea
+              name="message"
+              rows={5}
+              placeholder="Write your message here..."
+            />
           </label>
 
           <button className="contact-submit" type="submit">

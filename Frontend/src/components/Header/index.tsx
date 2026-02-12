@@ -8,17 +8,22 @@ type DocumentWithViewTransition = Document & {
 
 function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   const openLoginModal = () => setIsLoginModalOpen(true);
   const closeLoginModal = () => setIsLoginModalOpen(false);
+  const toggleMenu = () => setIsMenuOpen((prev) => !prev);
+  const closeMenu = () => setIsMenuOpen(false);
   const handleHomeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (location.pathname === "/") {
+      closeMenu();
       return;
     }
 
     event.preventDefault();
+    closeMenu();
 
     const docWithTransition = document as DocumentWithViewTransition;
     if (docWithTransition.startViewTransition) {
@@ -39,14 +44,32 @@ function Header() {
           <span className="logo-cit">CIT</span>
         </div>
 
-        <nav className="nav-links">
+        <nav className={`nav-links ${isMenuOpen ? "open" : ""}`}>
           <Link to="/" onClick={handleHomeClick}>
             Home
           </Link>
-          <a href="#about">About</a>
-          <Link to="/#contact">Contact Us</Link>
-          <a href="#history">History</a>
+          <a href="#about" onClick={closeMenu}>
+            About
+          </a>
+          <Link to="/#contact" onClick={closeMenu}>
+            Contact Us
+          </Link>
+          <a href="#history" onClick={closeMenu}>
+            History
+          </a>
         </nav>
+
+        <button
+          className="burger"
+          type="button"
+          aria-label="Toggle navigation menu"
+          aria-expanded={isMenuOpen}
+          onClick={toggleMenu}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
 
         <button
           className="user-icon"
