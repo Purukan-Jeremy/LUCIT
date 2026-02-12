@@ -3,26 +3,17 @@ import "../../assets/style.css";
 
 const SplashScreen: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(true);
-  const [isMounted, setIsMounted] = useState(true);
 
   useEffect(() => {
     // Start fading out the content
     const animationTimer = setTimeout(() => {
       setIsAnimating(false);
-    }, 4500);
-
-    // Remove component from DOM after fade out transition
-    const mountTimer = setTimeout(() => {
-      setIsMounted(false);
-    }, 5500);
+    }, 4300);
 
     return () => {
       clearTimeout(animationTimer);
-      clearTimeout(mountTimer);
     };
   }, []);
-
-  if (!isMounted) return null;
 
   return (
     <div className={`splash-screen ${!isAnimating ? "fade-out" : ""}`}>
