@@ -1,11 +1,23 @@
 import { useNavigate } from "react-router-dom";
 // Pastikan CSS Hero sudah terhubung (biasanya via global style.css)
 
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (updateCallback: () => void) => void;
+};
+
 function Hero() {
   const navigate = useNavigate();
 
   const handleStartDetection = () => {
-    // Ini memerintahkan website pindah ke url /analysis
+    const docWithTransition = document as DocumentWithViewTransition;
+
+    if (docWithTransition.startViewTransition) {
+      docWithTransition.startViewTransition(() => {
+        navigate("/analysis");
+      });
+      return;
+    }
+
     navigate("/analysis");
   };
 

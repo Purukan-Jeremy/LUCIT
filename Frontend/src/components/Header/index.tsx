@@ -1,12 +1,35 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import LoginModal from "../LoginModal";
+
+type DocumentWithViewTransition = Document & {
+  startViewTransition?: (updateCallback: () => void) => void;
+};
 
 function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const openLoginModal = () => setIsLoginModalOpen(true);
   const closeLoginModal = () => setIsLoginModalOpen(false);
+  const handleHomeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (location.pathname === "/") {
+      return;
+    }
+
+    event.preventDefault();
+
+    const docWithTransition = document as DocumentWithViewTransition;
+    if (docWithTransition.startViewTransition) {
+      docWithTransition.startViewTransition(() => {
+        navigate("/");
+      });
+      return;
+    }
+
+    navigate("/");
+  };
 
   return (
     <>
@@ -17,9 +40,11 @@ function Header() {
         </div>
 
         <nav className="nav-links">
-          <Link to="/">Home</Link>
+          <Link to="/" onClick={handleHomeClick}>
+            Home
+          </Link>
           <a href="#about">About</a>
-          <a href="#contact">Contact Us</a>
+          <Link to="/#contact">Contact Us</Link>
           <a href="#history">History</a>
         </nav>
 
