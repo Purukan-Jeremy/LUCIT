@@ -6,6 +6,7 @@ import Footer from "./components/Footer";
 import AnalysisPage from "./pages/analysis";
 import SplashScreen from "./components/SplashScreen";
 import ContactUs from "./components/ContactUs";
+import AboutUs from "./components/AboutUs";
 
 function ScrollHandler() {
   const location = useLocation();
@@ -60,6 +61,7 @@ function App() {
             element={
               <>
                 <Hero />
+                <AboutUs />
                 <ContactUs />
               </>
             }
