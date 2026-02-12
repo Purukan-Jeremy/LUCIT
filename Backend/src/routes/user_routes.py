@@ -1,13 +1,24 @@
-from fastapi import APIRouter
+from flask import Blueprint, request, jsonify
 from src.controllers.user_controller import get_users, create_user
-from src.models.user_schema import UserCreate
 
-router = APIRouter(prefix="/users", tags=["Users"])
+user_bp = Blueprint("user", __name__, url_prefix="/api/users")
 
-@router.get("/")
+@user_bp.route("/", methods=["GET"])
 def read_users():
-    return get_users()
+    try:
+        users = get_users() 
+        return jsonify(users)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-@router.post("/")
-def add_user(user: UserCreate):
-    return create_user(user)
+@user_bp.route("/", methods=["POST"])
+def add_user():
+    try:
+        data = request.json  
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+
+        result = create_user(data)  
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
