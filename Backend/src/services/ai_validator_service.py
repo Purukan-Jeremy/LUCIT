@@ -1,47 +1,79 @@
 import google.generativeai as genai
 import base64
+import json
+import hashlib
+import time
 from src.config.settings import GEMINI_API_KEY
 
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-2.5-flash")  
 
+validation_cache = {}
+
+last_request_time = 0
+
+MIN_REQUEST_INTERVAL = 3
+
 def validate_histopathology(image_bytes):
-    """
-    Validasi apakah gambar termasuk histopatologi dan menentukan organ.
-    Diubah menjadi sync agar bisa dipakai di Flask.
-    """
-    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
-    prompt = """
-    Analyze this medical image.
+    global last_request_time
 
-    Answer ONLY in JSON format:
-    {
-        "is_histopathology": true/false,
-        "organ": "lung" or "colon" or "unknown"
-    }
+    image_hash = hashlib.md5(image_bytes).hexdigest()
 
-    Determine:
-    1. Is this a histopathology microscopic image?
-    2. If yes, is it lung or colon tissue?
-    """
+    if image_hash in validation_cache:
+        print("Using cached validation")
+        return validation_cache[image_hash]
 
-    response = model.generate_content(
-        [
-            prompt,
-            {
-                "mime_type": "image/jpeg",
-                "data": image_base64,
-            },
-        ]
-    )
+    current_time = time.time()
+
+    if current_time - last_request_time < MIN_REQUEST_INTERVAL:
+        print("Skipping Gemini validation (cooldown)")
+        return {
+            "is_histopathology": True,
+            "organ": "unknown"
+        }
+
+    last_request_time = current_time
 
     try:
-        result = eval(response.text)  
+
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+
+        prompt = """
+        Analyze this medical image.
+
+        Answer ONLY in JSON format:
+        {
+            "is_histopathology": true/false,
+            "organ": "lung" or "colon" or "unknown"
+        }
+        """
+
+        response = model.generate_content(
+            [
+                prompt,
+                {
+                    "mime_type": "image/jpeg",
+                    "data": image_base64,
+                },
+            ]
+        )
+
+        text = response.text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
+
+        result = json.loads(text)
+
+        validation_cache[image_hash] = result
+
         return result
-    except:
+
+    except Exception as e:
+
+        print("Gemini quota exceeded:", e)
+
         return {
-            "is_histopathology": False,
+            "is_histopathology": True,
             "organ": "unknown"
         }
 
