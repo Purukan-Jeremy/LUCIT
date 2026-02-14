@@ -95,7 +95,7 @@ def make_gradcam_heatmap(img_array, base_model, classifier_layers=None, last_con
     return heatmap.numpy()
 
 
-def overlay_heatmap(original_img, heatmap, alpha=0.4, blur=True, invert=True):
+def overlay_heatmap(original_img, heatmap, alpha=0.4, blur=True, invert=False):
     """
     original_img: RGB image (H,W,3)
     heatmap     : Output dari make_gradcam_heatmap
@@ -112,9 +112,6 @@ def overlay_heatmap(original_img, heatmap, alpha=0.4, blur=True, invert=True):
     if blur:
         heatmap = cv2.GaussianBlur(heatmap, (25, 25), 0)
     
-    if invert:
-        heatmap = 1.0 - heatmap  
-
     heatmap = np.uint8(255 * heatmap)
     
     heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
