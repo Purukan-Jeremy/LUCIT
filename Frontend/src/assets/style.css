@@ -1,5 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap");
 
+/* =========================================
+   GLOBAL BASE
+   ========================================= */
+
 :root {
   --bg: #f7f4f9;
   --pink: #e91e63;
@@ -66,6 +70,10 @@ p {
 button {
   font-family: inherit;
 }
+
+/* =========================================
+   HEADER COMPONENT
+   ========================================= */
 
 .site-header {
   position: fixed;
@@ -188,7 +196,9 @@ button {
   margin-left: 8px;
 }
 
-/* HERO */
+/* =========================================
+   HOME PAGE - HERO SECTION
+   ========================================= */
 
 .hero {
   min-height: 100vh;
@@ -270,7 +280,9 @@ button {
   margin-bottom: 40px; /* jarak ke tombol, dibuat sama */
 }
 
-/* BUTTON */
+/* =========================================
+   SHARED BUTTONS
+   ========================================= */
 
 .primary-btn {
   padding: 14px 36px;
@@ -299,7 +311,9 @@ button {
   box-shadow: 0 6px 12px rgba(173, 20, 87, 0.3);
 }
 
-/* RESPONSIVE BREAKPOINTS */
+/* =========================================
+   HEADER + HERO RESPONSIVE
+   ========================================= */
 
 @media (max-width: 1024px) {
   .site-header {
@@ -724,7 +738,7 @@ button {
 }
 
 /* =========================================
-   FOOTER
+   SHARED - FOOTER
    ========================================= */
 
 .footer-section {
@@ -787,7 +801,10 @@ button {
   }
 }
 
-/* Contact Us */
+/* =========================================
+   HOME PAGE - CONTACT US SECTION
+   ========================================= */
+
 .contact-section {
   background-color: var(--purple);
   padding: 90px 0;
@@ -897,6 +914,11 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   SPLASH SCREEN COMPONENT
+   ========================================= */
+
 .splash-screen {
   position: fixed;
   top: 0;
@@ -1222,7 +1244,10 @@ button {
   animation-timing-function: ease;
 }
 
-/* About Us */
+/* =========================================
+   HOME PAGE - ABOUT US SECTION
+   ========================================= */
+
 .aboutus-section {
   width: 100%;
   min-height: calc(100vh - 72px);
