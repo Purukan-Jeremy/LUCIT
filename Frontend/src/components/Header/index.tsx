@@ -48,9 +48,9 @@ function Header() {
           <Link to="/" onClick={handleHomeClick}>
             Home
           </Link>
-          <a href="#about" onClick={closeMenu}>
+          <Link to="/#about" onClick={closeMenu}>
             About
-          </a>
+          </Link>
           <Link to="/#contact" onClick={closeMenu}>
             Contact Us
           </Link>
