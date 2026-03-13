@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
 
 const AnalysisPage: React.FC = () => {
@@ -9,6 +9,11 @@ const AnalysisPage: React.FC = () => {
   const [modelType, setModelType] = useState<
     "none" | "classification" | "segmentation"
   >("none");
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<
+    { role: "user" | "assistant"; text: string }[]
+  >([]);
 
   const [predictionResult, setPredictionResult] = useState<{
     status?: string;
@@ -23,6 +28,7 @@ const AnalysisPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [notice, setNotice] = useState<{ type: "info" | "error"; text: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -41,6 +47,12 @@ const AnalysisPage: React.FC = () => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const showNotice = (type: "info" | "error", text: string) => {
+    setNotice({ type, text });
+    window.clearTimeout((showNotice as any)._t);
+    (showNotice as any)._t = window.setTimeout(() => setNotice(null), 3200);
   };
 
   const sendImageToBackend = async (file: File) => {
@@ -79,7 +91,7 @@ const AnalysisPage: React.FC = () => {
       const errorMessage =
         error instanceof Error ? error.message : "Error analyzing image";
       setError(errorMessage);
-      alert(`Error: ${errorMessage}`);
+      showNotice("error", `Error: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +99,7 @@ const AnalysisPage: React.FC = () => {
 
   const handleStartAnalysis = async () => {
     if (!selectedImage || !selectedPreview || modelType === "none") {
-      alert("Please select an image and model type");
+      showNotice("info", "Please select a model and upload an image first.");
       return;
     }
 
@@ -102,15 +114,67 @@ const AnalysisPage: React.FC = () => {
     setPredictionResult(null);
     setError("");
     setModelType("none");
+    setNotice(null);
+    setChatOpen(false);
+    setChatInput("");
+    setChatMessages([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
+  const handleSendChat = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = chatInput.trim();
+    if (!message) return;
+
+    setChatMessages((prev) => [
+      ...prev,
+      { role: "user", text: message },
+      {
+        role: "assistant",
+        text: "LLM is not connected yet. This is UI only.",
+      },
+    ]);
+    setChatInput("");
+  };
+
+  useEffect(() => {
+    if (!chatOpen) {
+      document.body.classList.remove("chat-lock");
+    }
+  }, [chatOpen]);
+
+  const handleChatMouseEnter = () => {
+    document.body.classList.add("chat-lock");
+  };
+
+  const handleChatMouseLeave = () => {
+    document.body.classList.remove("chat-lock");
+  };
+
   return (
-    <div className="analysis-container">
-      <div className="analysis-card">
-        <div className="card-left">
+    <div className={`analysis-container ${chatOpen ? "chat-open" : ""}`}>
+      <div className="analysis-stack">
+        <div className="analysis-hero">
+          <h1>AI Histopathology Analysis</h1>
+          <p className="analysis-hero-subtitle">
+            Select a model, upload a histopathology image, and review clear AI‑assisted
+            insights for classification or segmentation.
+          </p>
+        </div>
+
+        {notice && (
+          <div className={`notice notice-top ${notice.type}`}>
+            <span>{notice.text}</span>
+            <button type="button" onClick={() => setNotice(null)} aria-label="Close notification">
+              ×
+            </button>
+          </div>
+        )}
+
+        <div className="analysis-card">
+          <div className="card-left">
           <h2 className="upload-title">
             {modelType === "classification"
               ? "Upload image histopathology for classification"
@@ -126,9 +190,19 @@ const AnalysisPage: React.FC = () => {
               accept="image/*"
               onChange={handleImageChange}
               ref={fileInputRef}
+              disabled={modelType === "none"}
               hidden
             />
-            <label htmlFor="file-upload" className="upload-label">
+            <label
+              htmlFor="file-upload"
+              className={`upload-label ${modelType === "none" ? "disabled" : ""}`}
+              onClick={(event) => {
+                if (modelType === "none") {
+                  event.preventDefault();
+                  showNotice("info", "Please select a model first.");
+                }
+              }}
+            >
               <div className="folder-icon">
                 <svg
                   width="80"
@@ -234,114 +308,179 @@ const AnalysisPage: React.FC = () => {
           )}
         </div>
 
-        <div className="card-right">
-          {isAnalyzed && modelType !== "none" && predictionResult ? (
-            <div className="analysis-result">
-              <div className="result-summary-card">
-                <div className="result-preview">
-                  {resultPreview ? (
-                    <img
-                      src={resultPreview}
-                      alt="Analysis result"
-                      className="result-preview-image"
-                      style={{
-                        width: "100%",
-                        height: "auto",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  ) : (
-                    <p>No visualization available</p>
-                  )}
-                </div>
+          <div className="card-right">
+            {isAnalyzed && modelType !== "none" && predictionResult ? (
+              <div className="analysis-result">
+                <div className="result-summary-card">
+                  <div className="result-preview">
+                    {resultPreview ? (
+                      <img
+                        src={resultPreview}
+                        alt="Analysis result"
+                        className="result-preview-image"
+                        style={{
+                          width: "100%",
+                          height: "auto",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    ) : (
+                      <p>No visualization available</p>
+                    )}
+                  </div>
 
-                <div className="result-metrics">
-                  <h3 style={{ marginBottom: "0.5rem" }}>Analysis Results</h3>
-                  <p>
-                    <strong>Prediction:</strong>{" "}
-                    <span
-                      style={{
-                        color: predictionResult?.prediction?.includes("Benign")
-                          ? "#28a745"
-                          : "#dc3545",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      {predictionResult?.prediction || "N/A"}
-                    </span>
-                  </p>
-                  <p>
-                    <strong>Confidence:</strong>{" "}
-                    {predictionResult?.confidence
-                      ? `${(predictionResult.confidence * 100).toFixed(2)}%`
-                      : "N/A"}
-                  </p>
-                </div>
-              </div>
-
-              <div className="result-description-card">
-                <h3>AI Analysis Description:</h3>
-
-                <div
-                  style={{
-                    whiteSpace: "pre-wrap",
-                    lineHeight: "1.8",
-                    textAlign: "justify",
-                    color: "rgba(255, 255, 255, 0.95)",
-                  }}
-                >
-                  {predictionResult?.ai_description ||
-                    "AI description is being generated..."}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: "1rem",
-                    padding: "0.75rem",
-                    backgroundColor: "#fff3cd",
-                    color: "#000",
-                    borderLeft: "4px solid #ffc107",
-                    borderRadius: "4px",
-                  }}
-                >
-                  <strong>⚠️ Disclaimer:</strong> This analysis is for research
-                  and educational purposes only. It should not be used as a
-                  substitute for professional medical diagnosis or treatment.
+                  <div className="result-metrics">
+                    <h3 style={{ marginBottom: "0.5rem" }}>Analysis Results</h3>
+                    <p>
+                      <strong>Prediction:</strong>{" "}
+                      <span
+                        style={{
+                          color: predictionResult?.prediction?.includes("Benign")
+                            ? "#28a745"
+                            : "#dc3545",
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {predictionResult?.prediction || "N/A"}
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Confidence:</strong>{" "}
+                      {predictionResult?.confidence
+                        ? `${(predictionResult.confidence * 100).toFixed(2)}%`
+                        : "N/A"}
+                    </p>
+                  </div>
                 </div>
               </div>
+            ) : (
+              <>
+                <h2>How It Works</h2>
+
+                <div className="steps-list">
+                  <div className="step-item">
+                    <h3>1. Upload Image</h3>
+                    <p>Upload histopathology image of lung or colon tissue.</p>
+                  </div>
+
+                  <div className="step-item">
+                    <h3>2. AI Analysis</h3>
+                    <p>
+                      AI performs classification to identify tissue categories and
+                      uses Grad-CAM visualization to highlight regions of interest
+                      that influenced the prediction.
+                    </p>
+                  </div>
+
+                  <div className="step-item">
+                    <h3>3. Result</h3>
+                    <p>
+                      Prediction results, Grad-CAM visualization, and AI-generated
+                      medical description are displayed to support early
+                      detection, not as a medical diagnosis.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {isAnalyzed && modelType !== "none" && predictionResult && (
+          <button
+            type="button"
+            className="chatbot-trigger animate-in"
+            onClick={() => setChatOpen(true)}
+            aria-label="Open consultation chatbot"
+            style={{ display: chatOpen ? "none" : "grid" }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+            </svg>
+          </button>
+        )}
+
+        {isAnalyzed && modelType !== "none" && predictionResult && (
+          <div className="analysis-description-card">
+            <h3>
+              AI Analysis Description for{" "}
+              {modelType === "classification" ? "Classification" : "Segmentation"}
+              :
+            </h3>
+
+            <div className="analysis-description-text">
+              {predictionResult?.ai_description ||
+                "AI description is being generated..."}
+            </div>
+
+            <div className="analysis-disclaimer">
+              <strong>⚠️ Disclaimer:</strong> This analysis is for research and
+              educational purposes only. It should not be used as a substitute
+              for professional medical diagnosis or treatment.
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div
+        className={`chatbot-sidebar ${chatOpen ? "open" : ""}`}
+        onMouseEnter={handleChatMouseEnter}
+        onMouseLeave={handleChatMouseLeave}
+      >
+        <div className="chatbot-header">
+          <div>AI Consultation Chat</div>
+          <button
+            type="button"
+            className="chatbot-close"
+            onClick={() => setChatOpen(false)}
+            aria-label="Close consultation chatbot"
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="chatbot-messages">
+          {chatMessages.length === 0 ? (
+            <div className="chatbot-empty">
+              Discuss the analysis results for{" "}
+              {modelType === "classification" ? "classification" : "segmentation"}{" "}
+              with the AI assistant.
             </div>
           ) : (
-            <>
-              <h2>How It Works</h2>
-
-              <div className="steps-list">
-                <div className="step-item">
-                  <h3>1. Upload Image</h3>
-                  <p>Upload histopathology image of lung or colon tissue.</p>
-                </div>
-
-                <div className="step-item">
-                  <h3>2. AI Analysis</h3>
-                  <p>
-                    AI performs classification to identify tissue categories and
-                    uses Grad-CAM visualization to highlight regions of interest
-                    that influenced the prediction.
-                  </p>
-                </div>
-
-                <div className="step-item">
-                  <h3>3. Result</h3>
-                  <p>
-                    Prediction results, Grad-CAM visualization, and AI-generated
-                    medical description are displayed to support early
-                    detection, not as a medical diagnosis.
-                  </p>
-                </div>
+            chatMessages.map((message, index) => (
+              <div
+                key={`${message.role}-${index}`}
+                className={`chatbot-message ${message.role}`}
+              >
+                <p>{message.text}</p>
               </div>
-            </>
+            ))
           )}
         </div>
+
+        <form className="chatbot-input" onSubmit={handleSendChat}>
+          <input
+            type="text"
+            placeholder="Type your question..."
+            value={chatInput}
+            onChange={(event) => setChatInput(event.target.value)}
+          />
+          <button type="submit">Send</button>
+        </form>
       </div>
+
+      {chatOpen && (
+        <div className="chatbot-backdrop" aria-hidden="true" />
+      )}
     </div>
   );
 };

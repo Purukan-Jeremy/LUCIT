@@ -49,7 +49,7 @@ function Header() {
             Home
           </Link>
           <Link to="/#about" onClick={closeMenu}>
-            About
+            About Us
           </Link>
           <Link to="/#contact" onClick={closeMenu}>
             Contact Us
