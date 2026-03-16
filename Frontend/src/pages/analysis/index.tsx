@@ -4,7 +4,8 @@ import "../../assets/style.css";
 const AnalysisPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedPreview, setSelectedPreview] = useState<string>("");
-  const [resultPreview, setResultPreview] = useState<string>("");
+  const [heatmapPreview, setHeatmapPreview] = useState<string>("");
+  const [overlayPreview, setOverlayPreview] = useState<string>("");
   const [isAnalyzed, setIsAnalyzed] = useState(false);
   const [modelType, setModelType] = useState<
     "none" | "classification" | "segmentation"
@@ -19,6 +20,7 @@ const AnalysisPage: React.FC = () => {
     status?: string;
     prediction?: string;
     confidence?: number;
+    gradcam_heatmap?: string;
     gradcam_image?: string;
     segmentation_mask?: string;
     ai_description?: string;
@@ -37,7 +39,8 @@ const AnalysisPage: React.FC = () => {
       const file = event.target.files[0];
       setSelectedImage(file);
       setIsAnalyzed(false);
-      setResultPreview("");
+      setHeatmapPreview("");
+      setOverlayPreview("");
       setPredictionResult(null);
       setError("");
 
@@ -79,10 +82,14 @@ const AnalysisPage: React.FC = () => {
 
       setPredictionResult(data);
 
+      if (data.gradcam_heatmap) {
+        setHeatmapPreview(`data:image/jpeg;base64,${data.gradcam_heatmap}`);
+      }
+
       if (data.gradcam_image) {
-        setResultPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
+        setOverlayPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
       } else if (data.segmentation_mask) {
-        setResultPreview(`data:image/png;base64,${data.segmentation_mask}`);
+        setOverlayPreview(`data:image/png;base64,${data.segmentation_mask}`);
       }
 
       setIsAnalyzed(true);
@@ -109,7 +116,8 @@ const AnalysisPage: React.FC = () => {
   const handleReset = () => {
     setSelectedImage(null);
     setSelectedPreview("");
-    setResultPreview("");
+    setHeatmapPreview("");
+    setOverlayPreview("");
     setIsAnalyzed(false);
     setPredictionResult(null);
     setError("");
@@ -309,47 +317,84 @@ const AnalysisPage: React.FC = () => {
         </div>
 
           <div className="card-right">
-            {isAnalyzed && modelType !== "none" && predictionResult ? (
+            {isLoading ? (
+              <div className="analysis-loading">
+                <div className="analysis-loading-spinner" aria-hidden="true" />
+                <div className="analysis-loading-text">Analyzing image...</div>
+              </div>
+            ) : isAnalyzed && modelType !== "none" && predictionResult ? (
               <div className="analysis-result">
                 <div className="result-summary-card">
-                  <div className="result-preview">
-                    {resultPreview ? (
-                      <img
-                        src={resultPreview}
-                        alt="Analysis result"
-                        className="result-preview-image"
-                        style={{
-                          width: "100%",
-                          height: "auto",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    ) : (
-                      <p>No visualization available</p>
-                    )}
-                  </div>
-
                   <div className="result-metrics">
                     <h3 style={{ marginBottom: "0.5rem" }}>Analysis Results</h3>
-                    <p>
-                      <strong>Prediction:</strong>{" "}
-                      <span
-                        style={{
-                          color: predictionResult?.prediction?.includes("Benign")
-                            ? "#28a745"
-                            : "#dc3545",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {predictionResult?.prediction || "N/A"}
-                      </span>
-                    </p>
-                    <p>
-                      <strong>Confidence:</strong>{" "}
-                      {predictionResult?.confidence
-                        ? `${(predictionResult.confidence * 100).toFixed(2)}%`
-                        : "N/A"}
-                    </p>
+                    <div className="metrics-center">
+                      <p>
+                        <span className="metric-label">Prediction:</span>
+                        <span
+                          className="metric-value"
+                          style={{
+                            color: predictionResult?.prediction?.includes("Benign")
+                              ? "#28a745"
+                              : "#dc3545",
+                          }}
+                        >
+                          {predictionResult?.prediction || "N/A"}
+                        </span>
+                      </p>
+                      <p>
+                        <span className="metric-label">Confidence:</span>
+                        <span className="metric-value">
+                          {predictionResult?.confidence
+                            ? `${(predictionResult.confidence * 100).toFixed(2)}%`
+                            : "N/A"}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="result-visuals">
+                    <div className="result-visual-card">
+                      <div className="result-visual-title">Original Image</div>
+                      {selectedPreview ? (
+                        <img
+                          src={selectedPreview}
+                          alt="Original"
+                          className="result-visual-image"
+                        />
+                      ) : (
+                        <div className="result-visual-empty">No image</div>
+                      )}
+                    </div>
+
+                    <div className="result-visual-card">
+                      <div className="result-visual-title">Grad-CAM Heatmap</div>
+                      {heatmapPreview ? (
+                        <img
+                          src={heatmapPreview}
+                          alt="Grad-CAM heatmap"
+                          className="result-visual-image"
+                        />
+                      ) : (
+                        <div className="result-visual-empty">
+                          Heatmap not available
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="result-visual-card">
+                      <div className="result-visual-title">Grad-CAM Overlay</div>
+                      {overlayPreview ? (
+                        <img
+                          src={overlayPreview}
+                          alt="Grad-CAM overlay"
+                          className="result-visual-image"
+                        />
+                      ) : (
+                        <div className="result-visual-empty">
+                          Overlay not available
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

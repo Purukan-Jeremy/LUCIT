@@ -3,7 +3,7 @@ import os
 
 _model_cache = {}
 
-def load_model(model_name="mobilenetv2E50.keras"):
+def load_model(model_name="mobilenetv2.keras"):
     """
     Load model Keras dan cache supaya tidak load berulang.
     Jika model sudah ada di cache, akan dikembalikan langsung.
@@ -26,7 +26,7 @@ def clear_model_cache(model_name=None):
     """
     Hapus cache model.
     - model_name=None → hapus semua cache
-    - model_name="mobilenetv2E41.keras" → hapus cache model tertentu
+    - model_name="mobilenetv2.keras" → hapus cache model tertentu
     """
     global _model_cache
     if model_name:

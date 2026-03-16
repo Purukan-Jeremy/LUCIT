@@ -92,7 +92,15 @@ def predict_image(file, model_type="classification"):
         )
 
         original_img = np.array(image)
+        heatmap_resized = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
+        heatmap_blurred = cv2.GaussianBlur(heatmap_resized, (25, 25), 0)
+        heatmap_uint8 = np.uint8(255 * heatmap_blurred)
+        heatmap_color = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
+
         gradcam_image = overlay_heatmap(original_img, heatmap)
+
+        _, heatmap_buffer = cv2.imencode(".jpg", heatmap_color)
+        heatmap_base64 = base64.b64encode(heatmap_buffer).decode("utf-8")
 
         _, buffer = cv2.imencode(".jpg", gradcam_image)
         gradcam_base64 = base64.b64encode(buffer).decode("utf-8")
@@ -110,6 +118,7 @@ def predict_image(file, model_type="classification"):
 
         _, buffer = cv2.imencode(".jpg", original_img)
         gradcam_base64 = base64.b64encode(buffer).decode("utf-8")
+        heatmap_base64 = None
 
  
     print("Generating AI description...")
@@ -127,6 +136,7 @@ def predict_image(file, model_type="classification"):
         "status": "success",
         "prediction": predicted_class,
         "confidence": confidence,
+        "gradcam_heatmap": heatmap_base64,
         "gradcam_image": gradcam_base64,
         "ai_description": ai_description,
     }
