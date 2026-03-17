@@ -31,6 +31,7 @@ const AnalysisPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [notice, setNotice] = useState<{ type: "info" | "error"; text: string } | null>(null);
+  const [modelSelectAttention, setModelSelectAttention] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -56,6 +57,16 @@ const AnalysisPage: React.FC = () => {
     setNotice({ type, text });
     window.clearTimeout((showNotice as any)._t);
     (showNotice as any)._t = window.setTimeout(() => setNotice(null), 3200);
+  };
+
+  const triggerModelSelectAttention = () => {
+    if (modelType !== "none") return;
+    setModelSelectAttention(true);
+    window.clearTimeout((triggerModelSelectAttention as any)._t);
+    (triggerModelSelectAttention as any)._t = window.setTimeout(
+      () => setModelSelectAttention(false),
+      2000,
+    );
   };
 
   const sendImageToBackend = async (file: File) => {
@@ -107,6 +118,7 @@ const AnalysisPage: React.FC = () => {
   const handleStartAnalysis = async () => {
     if (!selectedImage || !selectedPreview || modelType === "none") {
       showNotice("info", "Please select a model and upload an image first.");
+      triggerModelSelectAttention();
       return;
     }
 
@@ -130,6 +142,12 @@ const AnalysisPage: React.FC = () => {
       fileInputRef.current.value = "";
     }
   };
+
+  useEffect(() => {
+    if (modelType !== "none") {
+      setModelSelectAttention(false);
+    }
+  }, [modelType]);
 
   const handleSendChat = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -208,6 +226,7 @@ const AnalysisPage: React.FC = () => {
                 if (modelType === "none") {
                   event.preventDefault();
                   showNotice("info", "Please select a model first.");
+                  triggerModelSelectAttention();
                 }
               }}
             >
@@ -227,7 +246,9 @@ const AnalysisPage: React.FC = () => {
               </div>
             </label>
 
-            <div className="model-select">
+            <div
+              className={`model-select ${modelSelectAttention ? "attention" : ""}`}
+            >
               <select
                 id="model-type"
                 className="model-dropdown"
