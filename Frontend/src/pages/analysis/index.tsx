@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+type ChatMessage = { role: "user" | "assistant"; text: string };
+
 const AnalysisPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedPreview, setSelectedPreview] = useState<string>("");
@@ -12,9 +15,8 @@ const AnalysisPage: React.FC = () => {
   >("none");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<
-    { role: "user" | "assistant"; text: string }[]
-  >([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const [predictionResult, setPredictionResult] = useState<{
     status?: string;
@@ -34,6 +36,8 @@ const AnalysisPage: React.FC = () => {
   const [modelSelectAttention, setModelSelectAttention] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const noticeTimeoutRef = useRef<number | null>(null);
+  const modelSelectTimeoutRef = useRef<number | null>(null);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -55,15 +59,19 @@ const AnalysisPage: React.FC = () => {
 
   const showNotice = (type: "info" | "error", text: string) => {
     setNotice({ type, text });
-    window.clearTimeout((showNotice as any)._t);
-    (showNotice as any)._t = window.setTimeout(() => setNotice(null), 3200);
+    if (noticeTimeoutRef.current !== null) {
+      window.clearTimeout(noticeTimeoutRef.current);
+    }
+    noticeTimeoutRef.current = window.setTimeout(() => setNotice(null), 3200);
   };
 
   const triggerModelSelectAttention = () => {
     if (modelType !== "none") return;
     setModelSelectAttention(true);
-    window.clearTimeout((triggerModelSelectAttention as any)._t);
-    (triggerModelSelectAttention as any)._t = window.setTimeout(
+    if (modelSelectTimeoutRef.current !== null) {
+      window.clearTimeout(modelSelectTimeoutRef.current);
+    }
+    modelSelectTimeoutRef.current = window.setTimeout(
       () => setModelSelectAttention(false),
       2000,
     );
@@ -80,7 +88,7 @@ const AnalysisPage: React.FC = () => {
       setIsLoading(true);
       setError("");
 
-      const response = await fetch("http://localhost:8000/api/predict", {
+      const response = await fetch(`${API_BASE_URL}/api/predict`, {
         method: "POST",
         body: formData,
       });
@@ -107,7 +115,11 @@ const AnalysisPage: React.FC = () => {
     } catch (error) {
       console.error("Error uploading image:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Error analyzing image";
+        error instanceof TypeError
+          ? `Cannot reach backend at ${API_BASE_URL}. Make sure the backend server is running and CORS/network settings are correct.`
+          : error instanceof Error
+            ? error.message
+            : "Error analyzing image";
       setError(errorMessage);
       showNotice("error", `Error: ${errorMessage}`);
     } finally {
@@ -138,6 +150,7 @@ const AnalysisPage: React.FC = () => {
     setChatOpen(false);
     setChatInput("");
     setChatMessages([]);
+    setIsChatLoading(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -149,35 +162,95 @@ const AnalysisPage: React.FC = () => {
     }
   }, [modelType]);
 
-  const handleSendChat = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    return () => {
+      if (noticeTimeoutRef.current !== null) {
+        window.clearTimeout(noticeTimeoutRef.current);
+      }
+      if (modelSelectTimeoutRef.current !== null) {
+        window.clearTimeout(modelSelectTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleSendChat = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const message = chatInput.trim();
     if (!message) return;
+    if (!predictionResult) {
+      showNotice("info", "Run an analysis first before using the chatbot.");
+      return;
+    }
 
-    setChatMessages((prev) => [
-      ...prev,
-      { role: "user", text: message },
-      {
-        role: "assistant",
-        text: "LLM is not connected yet. This is UI only.",
-      },
-    ]);
+    const nextUserMessage: ChatMessage = { role: "user", text: message };
+    const nextChatHistory = [...chatMessages, nextUserMessage];
+
+    setChatMessages(nextChatHistory);
     setChatInput("");
+
+    try {
+      setIsChatLoading(true);
+
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message,
+          chat_history: chatMessages,
+          analysis_context: {
+            model_type: modelType,
+            prediction: predictionResult.prediction,
+            confidence: predictionResult.confidence,
+            ai_description: predictionResult.ai_description,
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.status === "error") {
+        throw new Error(data.message || "Chat request failed");
+      }
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: data.reply || "No reply returned by chatbot.",
+        },
+      ]);
+    } catch (chatError) {
+      console.error("Error sending chat message:", chatError);
+      const errorMessage =
+        chatError instanceof Error
+          ? chatError.message
+          : "Failed to get chatbot response";
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `Chatbot error: ${errorMessage}`,
+        },
+      ]);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   useEffect(() => {
-    if (!chatOpen) {
+    if (chatOpen) {
+      document.body.classList.add("chat-lock");
+    } else {
       document.body.classList.remove("chat-lock");
     }
+
+    return () => {
+      document.body.classList.remove("chat-lock");
+    };
   }, [chatOpen]);
-
-  const handleChatMouseEnter = () => {
-    document.body.classList.add("chat-lock");
-  };
-
-  const handleChatMouseLeave = () => {
-    document.body.classList.remove("chat-lock");
-  };
 
   return (
     <div className={`analysis-container ${chatOpen ? "chat-open" : ""}`}>
@@ -354,9 +427,7 @@ const AnalysisPage: React.FC = () => {
                         <span
                           className="metric-value"
                           style={{
-                            color: predictionResult?.prediction?.includes("Benign")
-                              ? "#28a745"
-                              : "#dc3545",
+                            color: "#ffffff",
                           }}
                         >
                           {predictionResult?.prediction || "N/A"}
@@ -499,8 +570,6 @@ const AnalysisPage: React.FC = () => {
 
       <div
         className={`chatbot-sidebar ${chatOpen ? "open" : ""}`}
-        onMouseEnter={handleChatMouseEnter}
-        onMouseLeave={handleChatMouseLeave}
       >
         <div className="chatbot-header">
           <div>AI Consultation Chat</div>
@@ -531,6 +600,11 @@ const AnalysisPage: React.FC = () => {
               </div>
             ))
           )}
+          {isChatLoading && (
+            <div className="chatbot-message assistant">
+              <p>Analyzing your question...</p>
+            </div>
+          )}
         </div>
 
         <form className="chatbot-input" onSubmit={handleSendChat}>
@@ -539,13 +613,20 @@ const AnalysisPage: React.FC = () => {
             placeholder="Type your question..."
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
+            disabled={isChatLoading}
           />
-          <button type="submit">Send</button>
+          <button type="submit" disabled={isChatLoading}>
+            {isChatLoading ? "Sending..." : "Send"}
+          </button>
         </form>
       </div>
 
       {chatOpen && (
-        <div className="chatbot-backdrop" aria-hidden="true" />
+        <div
+          className="chatbot-backdrop open"
+          aria-hidden="true"
+          onClick={() => setChatOpen(false)}
+        />
       )}
     </div>
   );

@@ -2,9 +2,11 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from src.config.supabase import supabase
 from src.controllers.prediction_controller import predict_image
+from src.routes.chatbot_routes import chatbot_bp
 
 app = Flask(__name__)
 CORS(app)  
+app.register_blueprint(chatbot_bp)
 
 @app.route("/", methods=["GET"])
 def root():

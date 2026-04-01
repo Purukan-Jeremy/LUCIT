@@ -16,6 +16,20 @@ function Header() {
   const closeLoginModal = () => setIsLoginModalOpen(false);
   const toggleMenu = () => setIsMenuOpen((prev) => !prev);
   const closeMenu = () => setIsMenuOpen(false);
+
+  const navigateWithTransition = (to: string) => {
+    const docWithTransition = document as DocumentWithViewTransition;
+
+    if (docWithTransition.startViewTransition) {
+      docWithTransition.startViewTransition(() => {
+        navigate(to);
+      });
+      return;
+    }
+
+    navigate(to);
+  };
+
   const handleHomeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     if (location.pathname === "/") {
       closeMenu();
@@ -24,22 +38,24 @@ function Header() {
 
     event.preventDefault();
     closeMenu();
+    navigateWithTransition("/");
+  };
 
-    const docWithTransition = document as DocumentWithViewTransition;
-    if (docWithTransition.startViewTransition) {
-      docWithTransition.startViewTransition(() => {
-        navigate("/");
-      });
+  const handleHistoryClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (location.pathname === "/history") {
+      closeMenu();
       return;
     }
 
-    navigate("/");
+    event.preventDefault();
+    closeMenu();
+    navigateWithTransition("/history");
   };
 
   return (
     <>
       <header className="site-header">
-        <div className="logo">
+        <div className="logo" aria-label="LUCIT">
           <span className="logo-lu">LU</span>
           <span className="logo-cit">CIT</span>
         </div>
@@ -54,9 +70,9 @@ function Header() {
           <Link to="/#contact" onClick={closeMenu}>
             Contact Us
           </Link>
-          <a href="#history" onClick={closeMenu}>
+          <Link to="/history" onClick={handleHistoryClick}>
             History
-          </a>
+          </Link>
         </nav>
 
         <button
