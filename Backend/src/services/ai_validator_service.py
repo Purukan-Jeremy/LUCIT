@@ -3,10 +3,12 @@ import base64
 import json
 import hashlib
 import time
-from src.config.settings import GEMINI_API_KEY
+from src.config.settings import GEMINI_API_KEY, GEMINI_DESCRIPTION_MODEL
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")  
+
+def get_description_model():
+    genai.configure(api_key=GEMINI_API_KEY)
+    return genai.GenerativeModel(GEMINI_DESCRIPTION_MODEL)
 
 validation_cache = {}
 
@@ -49,7 +51,7 @@ def validate_histopathology(image_bytes):
         }
         """
 
-        response = model.generate_content(
+        response = get_description_model().generate_content(
             [
                 prompt,
                 {
@@ -107,7 +109,7 @@ Saya telah menganalisis gambar histopatologi dengan hasil berikut:
 
 Tolong analisis gambar histopatologi ini dan berikan deskripsi medis yang detail dalam Bahasa Indonesia. Jawab HANYA dalam Bahasa Indonesia, dalam paragraf yang mengalir, tanpa numbering atau bullets. Panjang total: sekitar 12-15 kalimat."""
 
-        response = model.generate_content(
+        response = get_description_model().generate_content(
             [
                 prompt,
                 {

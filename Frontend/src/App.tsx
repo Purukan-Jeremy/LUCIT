@@ -4,6 +4,7 @@ import Header from "./components/Header";
 import Hero from "./components/Hero";
 import Footer from "./components/Footer";
 import AnalysisPage from "./pages/analysis";
+import HistoryPage from "./pages/history";
 import SplashScreen from "./components/SplashScreen";
 import ContactUs from "./components/ContactUs";
 import AboutUs from "./components/AboutUs";
@@ -19,7 +20,7 @@ function ScrollHandler() {
         return;
       }
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
   }, [location]);
 
   return null;
@@ -69,6 +70,7 @@ function App() {
 
           {/* Halaman Analysis (Tujuan saat tombol ditekan) */}
           <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/history" element={<HistoryPage />} />
         </Routes>
 
         <Footer />

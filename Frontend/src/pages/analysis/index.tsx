@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+type ChatMessage = { role: "user" | "assistant"; text: string };
+
 const AnalysisPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedPreview, setSelectedPreview] = useState<string>("");
@@ -34,6 +37,8 @@ const AnalysisPage: React.FC = () => {
   const [modelSelectAttention, setModelSelectAttention] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const noticeTimeoutRef = useRef<number | null>(null);
+  const modelSelectTimeoutRef = useRef<number | null>(null);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -80,7 +85,7 @@ const AnalysisPage: React.FC = () => {
       setIsLoading(true);
       setError("");
 
-      const response = await fetch("http://localhost:8000/api/predict", {
+      const response = await fetch(`${API_BASE_URL}/api/predict`, {
         method: "POST",
         body: formData,
       });
@@ -107,7 +112,11 @@ const AnalysisPage: React.FC = () => {
     } catch (error) {
       console.error("Error uploading image:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Error analyzing image";
+        error instanceof TypeError
+          ? `Cannot reach backend at ${API_BASE_URL}. Make sure the backend server is running and CORS/network settings are correct.`
+          : error instanceof Error
+            ? error.message
+            : "Error analyzing image";
       setError(errorMessage);
       showNotice("error", `Error: ${errorMessage}`);
     } finally {
@@ -275,12 +284,9 @@ const AnalysisPage: React.FC = () => {
               <img
                 src={selectedPreview}
                 alt="Selected preview"
+                className="selected-preview-image"
                 style={{
                   width: "100%",
-                  maxHeight: "200px",
-                  objectFit: "contain",
-                  borderRadius: "8px",
-                  border: "2px solid #ddd",
                 }}
               />
             </div>
@@ -323,13 +329,9 @@ const AnalysisPage: React.FC = () => {
 
           {error && (
             <div
+              className="analysis-error-panel"
               style={{
                 marginTop: "1rem",
-                padding: "1rem",
-                backgroundColor: "#f8d7da",
-                color: "#721c24",
-                borderRadius: "8px",
-                fontSize: "0.9rem",
               }}
             >
               <strong>Error:</strong> {error}
