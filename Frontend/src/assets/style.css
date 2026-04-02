@@ -548,15 +548,15 @@ button {
 
 .analysis-container {
   min-height: 100vh;
-  padding: 88px 12px 180px;
+  padding: 104px 16px 180px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background-color: var(--bg);
 }
 
 .analysis-stack {
-  width: min(1440px, calc(100vw - 24px));
+  width: min(1440px, 100%);
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -587,13 +587,14 @@ button {
 .analysis-card {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(340px, 0.96fr) minmax(0, 1.04fr);
+  grid-template-columns: minmax(0, 0.94fr) minmax(0, 1.06fr);
   background: #ffffff;
   border-radius: 10px;
   overflow: hidden;
   border: 2px solid rgba(0, 0, 0, 0.18);
   box-shadow: 0 22px 42px rgba(0, 0, 0, 0.08);
   position: relative;
+  min-height: 640px;
 }
 
 .analysis-container.chat-open .analysis-stack {
@@ -607,8 +608,9 @@ button {
   padding: clamp(40px, 4vw, 64px) clamp(28px, 5vw, 88px);
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: center;
   gap: 20px;
+  min-width: 0;
 }
 
 .card-left h2,
@@ -617,6 +619,8 @@ button {
   font-weight: 700;
   text-align: center;
   margin-bottom: 8px;
+  margin-top: 0;
+  text-wrap: balance;
 }
 
 .steps-list {
@@ -655,6 +659,7 @@ button {
   gap: 14px;
   border-left: 2px solid rgba(255, 255, 255, 0.4);
   position: relative;
+  min-width: 0;
 }
 
 .analysis-container + .footer-section {
@@ -857,7 +862,6 @@ button {
 /* ANALYSIS - HOW IT WORKS TEXT */
 .card-right h2 {
   margin-bottom: 12px;
-  margin-top: auto;
 }
 
 .card-right .steps-list {
@@ -1162,7 +1166,9 @@ button {
 
 .upload-box {
   width: min(720px, 100%);
-  height: 460px;
+  aspect-ratio: 4 / 3;
+  min-height: 280px;
+  height: auto;
   padding: 16px 16px 56px;
   box-sizing: border-box;
   border: 3px dashed #111111;
@@ -1177,6 +1183,23 @@ button {
 
 .upload-box:hover {
   background: rgba(0, 0, 0, 0.03);
+}
+
+.selected-preview-image {
+  display: block;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: 10px;
+  border: 2px solid #ddd;
+}
+
+.analysis-error-panel {
+  padding: 1rem;
+  background-color: #f8d7da;
+  color: #721c24;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .upload-label {
@@ -1264,7 +1287,7 @@ button {
   }
 
   .upload-box {
-    height: 360px;
+    min-height: 360px;
     padding: 14px 14px 54px;
   }
 
@@ -1297,7 +1320,7 @@ button {
 
 @media (max-width: 1024px) {
   .analysis-container {
-    padding: 80px 12px 120px;
+    padding: 96px 12px 120px;
   }
 
   .analysis-card {
@@ -1309,9 +1332,23 @@ button {
     padding: 38px 26px;
   }
 
+  .card-left h2,
+  .card-right h2 {
+    text-align: left;
+  }
+
+  .card-right .steps-list {
+    margin: 0;
+    max-width: 100%;
+  }
+
   .upload-box {
-    height: 300px;
+    min-height: 300px;
     padding: 12px 12px 52px;
+  }
+
+  .selected-preview-image {
+    max-height: 220px;
   }
 
   .model-select {
@@ -1321,6 +1358,11 @@ button {
   .result-summary-card {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .start-analysis-btn {
+    width: 100%;
+    min-width: 0;
   }
 
   .chatbot-sidebar {
@@ -1408,7 +1450,7 @@ button {
 
 @media (max-width: 768px) {
   .analysis-container {
-    padding: 76px 10px 112px;
+    padding: 88px 10px 112px;
   }
 
   .analysis-stack {
@@ -1434,23 +1476,29 @@ button {
     padding: 34px 22px;
   }
 
+  .card-left h2,
+  .card-right h2 {
+    font-size: 24px;
+    text-align: left;
+  }
+
   .upload-title {
     font-size: 22px;
     max-width: 360px;
   }
 
   .upload-box {
-    height: 280px;
+    min-height: 260px;
+    aspect-ratio: 1 / 1;
+  }
+
+  .selected-preview-image {
+    max-height: 200px;
   }
 
   .steps-list {
     gap: 20px;
     max-width: 100%;
-  }
-
-  .card-left h2,
-  .card-right h2 {
-    font-size: 26px;
   }
 
   .step-item h3 {
@@ -1517,7 +1565,7 @@ button {
 
 @media (max-width: 600px) {
   .analysis-container {
-    padding: 72px 10px 104px;
+    padding: 84px 10px 104px;
   }
 
   .analysis-stack {
@@ -1532,6 +1580,11 @@ button {
   .card-left,
   .card-right {
     padding: 28px 18px;
+  }
+
+  .card-left h2,
+  .card-right h2 {
+    font-size: 20px;
   }
 
   .analysis-hero h1 {
@@ -1549,13 +1602,12 @@ button {
   }
 
   .upload-box {
-    height: 250px;
+    min-height: 220px;
     padding-bottom: 46px;
   }
 
-  .card-left h2,
-  .card-right h2 {
-    font-size: 22px;
+  .selected-preview-image {
+    max-height: 180px;
   }
 
   .step-item h3 {
@@ -1620,6 +1672,12 @@ button {
     bottom: 70px;
     width: 46px;
     height: 46px;
+  }
+
+  .start-analysis-btn {
+    width: 100%;
+    min-width: 0;
+    padding: 14px 18px;
   }
 
   .chatbot-sidebar {

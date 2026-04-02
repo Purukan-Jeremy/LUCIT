@@ -348,12 +348,9 @@ const AnalysisPage: React.FC = () => {
               <img
                 src={selectedPreview}
                 alt="Selected preview"
+                className="selected-preview-image"
                 style={{
                   width: "100%",
-                  maxHeight: "200px",
-                  objectFit: "contain",
-                  borderRadius: "8px",
-                  border: "2px solid #ddd",
                 }}
               />
             </div>
@@ -396,13 +393,9 @@ const AnalysisPage: React.FC = () => {
 
           {error && (
             <div
+              className="analysis-error-panel"
               style={{
                 marginTop: "1rem",
-                padding: "1rem",
-                backgroundColor: "#f8d7da",
-                color: "#721c24",
-                borderRadius: "8px",
-                fontSize: "0.9rem",
               }}
             >
               <strong>Error:</strong> {error}
