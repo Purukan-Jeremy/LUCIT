@@ -33,6 +33,13 @@ def create_user():
     result = create_user_controller(data)
     return jsonify(result)
 
+@app.route("/api/login", methods=["POST"])
+def login():
+    data = request.json
+    from src.controllers.user_controller import login_user
+    result = login_user(data)
+    return jsonify(result)
+
 @app.route("/api/predict", methods=["POST"])
 def predict():
     """

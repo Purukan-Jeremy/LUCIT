@@ -1,4 +1,9 @@
 Flask==3.0.0
-supabase==2.3.0
+flask-cors==4.0.0
+supabase==2.13.0
 python-dotenv==1.0.0
 numpy==1.26.0
+tensorflow>=2.16.1
+opencv-python==4.8.1.78
+Pillow==10.1.0
+google-generativeai==0.3.1

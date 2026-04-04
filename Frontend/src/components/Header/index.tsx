@@ -9,6 +9,12 @@ type DocumentWithViewTransition = Document & {
 function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState<{ fullname: string; email: string } | null>(() => {
+    const saved = localStorage.getItem("lucit_user");
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -17,17 +23,15 @@ function Header() {
   const toggleMenu = () => setIsMenuOpen((prev) => !prev);
   const closeMenu = () => setIsMenuOpen(false);
 
-  const navigateWithTransition = (to: string) => {
-    const docWithTransition = document as DocumentWithViewTransition;
+  const handleLoginSuccess = (userData: { fullname: string; email: string }) => {
+    setUser(userData);
+  };
 
-    if (docWithTransition.startViewTransition) {
-      docWithTransition.startViewTransition(() => {
-        navigate(to);
-      });
-      return;
-    }
-
-    navigate(to);
+  const handleLogout = () => {
+    localStorage.removeItem("lucit_user");
+    setUser(null);
+    setShowProfileDropdown(false);
+    navigate("/");
   };
 
   const handleHomeClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -87,17 +91,44 @@ function Header() {
           <span />
         </button>
 
-        <button
-          className="user-icon"
-          aria-label="User profile"
-          onClick={openLoginModal}
-        >
-          <span className="icon">👤</span>
-          <span className="login-text">Login</span>
-        </button>
+        {!user ? (
+          <button
+            className="user-icon"
+            aria-label="User profile"
+            onClick={openLoginModal}
+          >
+            <span className="icon">👤</span>
+            <span className="login-text">Login</span>
+          </button>
+        ) : (
+          <div className="user-profile-container">
+            <button
+              className="user-profile-btn"
+              onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+            >
+              <div className="user-profile-info">
+                <span className="user-fullname">{user.fullname}</span>
+                <span className="user-email">{user.email}</span>
+              </div>
+              <span className="icon">👤</span>
+            </button>
+
+            {showProfileDropdown && (
+              <div className="profile-dropdown">
+                <button onClick={handleLogout} className="logout-btn">
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </header>
 
-      <LoginModal isOpen={isLoginModalOpen} onClose={closeLoginModal} />
+      <LoginModal 
+        isOpen={isLoginModalOpen} 
+        onClose={closeLoginModal} 
+        onLoginSuccess={handleLoginSuccess}
+      />
     </>
   );
 }
