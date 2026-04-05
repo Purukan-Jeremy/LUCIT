@@ -1,47 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import "../../assets/style.css";
+
+const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
+const USER_STORAGE_KEY = "lucit_user";
 
 type HistoryItem = {
   id: number;
   prediction: string;
   confidence: string;
-  date: string;
+  createdAt: string;
   model: string;
   description: string;
-  variant: "lung" | "colon" | "breast";
+  variant: "lung" | "colon" | "breast" | "unknown";
+  originalImage?: string;
+  heatmapImage?: string;
+  overlayImage?: string;
 };
-
-const historyItems: HistoryItem[] = [
-  {
-    id: 1,
-    prediction: "Lung Benign",
-    confidence: "99.99%",
-    date: "01 April 2026",
-    model: "Classification",
-    description:
-      "The tissue pattern is dominated by benign pulmonary structures with relatively uniform nuclei, preserved tissue organization, and no obvious malignant infiltration. Cellular density appears stable across the observed area, while the nuclear morphology remains relatively consistent without aggressive pleomorphism. The heatmap and overlay views emphasize low-risk regions and distribute attention broadly rather than concentrating on suspicious focal lesions. This pattern supports a non-malignant interpretation and suggests that the model is identifying normal or reactive histological features instead of invasive disease. Overall, the result indicates a high-confidence benign classification with visual evidence that is consistent across the original image, activation map, and overlay comparison.",
-    variant: "lung",
-  },
-  {
-    id: 2,
-    prediction: "Colon Benign",
-    confidence: "99.99%",
-    date: "29 March 2026",
-    model: "Classification",
-    description:
-      "The colon sample shows organized glandular morphology with preserved structural boundaries and no destructive architectural change that would typically suggest malignant progression. Tissue arrangement remains relatively balanced, and there is no dominant region that visually indicates irregular invasion or severe disruption. The activation map remains focused on benign regions and aligns with areas that retain normal-looking glandular composition, suggesting that the model is responding to stable histopathological characteristics rather than abnormal tumor-associated patterns. When viewed together with the overlay representation, the highlighted areas remain coherent and support a consistent decision pathway. This produces a stable benign classification result with high confidence and reinforces the interpretation that the observed tissue is more compatible with non-malignant colon histology.",
-    variant: "colon",
-  },
-  {
-    id: 3,
-    prediction: "Breast Malignant",
-    confidence: "98.72%",
-    date: "26 March 2026",
-    model: "Segmentation",
-    description:
-      "The segmented regions highlight suspicious tissue distribution with irregular cell density, heterogeneous structure, and invasive boundaries that differ from surrounding areas. Several highlighted zones appear to cluster around the dominant lesion region, suggesting that the model is consistently detecting patterns associated with malignant behavior rather than isolated visual noise. The overlay indicates that these suspicious regions remain spatially coherent across the analyzed field, while the heatmap intensifies around areas with stronger abnormal morphological cues. Compared with a benign presentation, the tissue in this sample appears less organized and more structurally distorted, supporting the segmentation outcome. Taken together, the original image, heatmap, and overlay provide a stronger visual basis for identifying malignant tissue involvement and explain why the model returns a high-confidence abnormal result.",
-    variant: "breast",
-  },
-];
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -64,21 +38,115 @@ function renderHighlightedText(text: string, query: string) {
   );
 }
 
+function formatDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+}
+
 function HistoryPage() {
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
+  const [items, setItems] = useState<HistoryItem[]>([]);
+  const [userFullname, setUserFullname] = useState("Guest");
+
+  useEffect(() => {
+    const syncUser = () => {
+      try {
+        const rawUser = localStorage.getItem(USER_STORAGE_KEY);
+        const parsedUser = rawUser ? JSON.parse(rawUser) : null;
+        setUserFullname(parsedUser?.fullname || "Guest");
+      } catch (error) {
+        console.error("Failed to load current user:", error);
+        setUserFullname("Guest");
+      }
+    };
+
+    syncUser();
+    window.addEventListener("storage", syncUser);
+
+    return () => window.removeEventListener("storage", syncUser);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(ANALYSIS_HISTORY_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      const safeItems = Array.isArray(parsed) ? parsed : [];
+      setItems(safeItems);
+    } catch (error) {
+      console.error("Failed to load analysis history:", error);
+      setItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (deleteTargetId === null) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDeleteTargetId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [deleteTargetId]);
 
   const filteredItems = useMemo(() => {
     const keyword = query.trim().toLowerCase();
-    if (!keyword) return historyItems;
+    if (!keyword) return items;
 
-    return historyItems.filter((item) =>
-      [item.prediction, item.confidence, item.date, item.model]
+    return items.filter((item) =>
+      [
+        item.prediction,
+        item.confidence,
+        formatDate(item.createdAt),
+        item.model,
+        item.description,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(keyword),
     );
-  }, [query]);
+  }, [items, query]);
+
+  const handleDeleteHistory = (id: number) => {
+    const updatedItems = items.filter((item) => item.id !== id);
+    localStorage.setItem(ANALYSIS_HISTORY_KEY, JSON.stringify(updatedItems));
+    setItems(updatedItems);
+    if (expandedId === id) {
+      setExpandedId(null);
+    }
+  };
+
+  const handleToggleDetail = (id: number) => {
+    setExpandedId((current) => (current === id ? null : id));
+  };
+
+  const handleDeleteClick = (id: number) => {
+    setDeleteTargetId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteTargetId === null) return;
+    handleDeleteHistory(deleteTargetId);
+    setExpandedId(null);
+    setDeleteTargetId(null);
+  };
 
   return (
     <main className="history-page">
@@ -109,11 +177,22 @@ function HistoryPage() {
               <div className="history-card-thumb-wrap">
                 <div
                   className={`history-card-thumb history-thumb-${item.variant}`}
+                  style={
+                    item.originalImage
+                      ? { backgroundImage: `url("${item.originalImage}")` }
+                      : undefined
+                  }
                   aria-hidden="true"
                 />
               </div>
 
               <div className="history-card-content">
+                <div className="history-card-topbar">
+                  <strong className="history-card-name">
+                    {renderHighlightedText(userFullname, query)}
+                  </strong>
+                </div>
+
                 <div className="history-card-main">
                   <div className="history-card-row">
                     <span className="history-card-label">Prediction</span>
@@ -133,38 +212,44 @@ function HistoryPage() {
                 </div>
 
                 <div className="history-card-meta">
-                  <strong className="history-card-name">Dr.Poppy</strong>
                   <div className="history-card-meta-center">
                     <span className="history-card-model">
                       {renderHighlightedText(item.model, query)}
                     </span>
-                    <span>{renderHighlightedText(item.date, query)}</span>
+                    <span>{renderHighlightedText(formatDate(item.createdAt), query)}</span>
                   </div>
-                  <button
-                    type="button"
-                    className="history-card-button"
-                    aria-expanded={expandedId === item.id}
-                    aria-controls={`history-detail-${item.id}`}
-                    onClick={() =>
-                      setExpandedId((current) => (current === item.id ? null : item.id))
-                    }
-                  >
-                    {expandedId === item.id ? "Hide Details" : "More Details"}
-                    <svg
-                      className="history-card-button-icon"
-                      aria-hidden="true"
-                      viewBox="0 0 12 12"
-                      fill="none"
+                  <div className="history-card-actions">
+                    <button
+                      type="button"
+                      className="history-card-button history-card-button-delete"
+                      onClick={() => handleDeleteClick(item.id)}
                     >
-                      <path
-                        d="M2.25 4.5L6 8.25L9.75 4.5"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
+                      Delete
+                    </button>
+                    <button
+                      type="button"
+                      className="history-card-button"
+                      aria-expanded={expandedId === item.id}
+                      aria-controls={`history-detail-${item.id}`}
+                      onClick={() => handleToggleDetail(item.id)}
+                    >
+                      {expandedId === item.id ? "Hide Details" : "More Details"}
+                      <svg
+                        className="history-card-button-icon"
+                        aria-hidden="true"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
+                        <path
+                          d="M2.25 4.5L6 8.25L9.75 4.5"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -179,6 +264,11 @@ function HistoryPage() {
                       <span>Original</span>
                       <div
                         className={`history-detail-gallery-thumb history-thumb-${item.variant}`}
+                        style={
+                          item.originalImage
+                            ? { backgroundImage: `url("${item.originalImage}")` }
+                            : undefined
+                        }
                         aria-hidden="true"
                       />
                     </div>
@@ -187,6 +277,11 @@ function HistoryPage() {
                       <span>Heatmap</span>
                       <div
                         className={`history-detail-gallery-thumb history-detail-heatmap history-detail-heatmap-${item.variant}`}
+                        style={
+                          item.heatmapImage
+                            ? { backgroundImage: `url("${item.heatmapImage}")` }
+                            : undefined
+                        }
                         aria-hidden="true"
                       />
                     </div>
@@ -195,6 +290,11 @@ function HistoryPage() {
                       <span>Overlay</span>
                       <div
                         className={`history-detail-gallery-thumb history-detail-overlay history-detail-overlay-${item.variant}`}
+                        style={
+                          item.overlayImage
+                            ? { backgroundImage: `url("${item.overlayImage}")` }
+                            : undefined
+                        }
                         aria-hidden="true"
                       />
                     </div>
@@ -210,11 +310,50 @@ function HistoryPage() {
           ))
         ) : (
           <div className="history-empty">
-            <h2>No history found</h2>
-            <p>Try another keyword to find previous analysis results.</p>
+            <h2>History is Empty</h2>
+            <p>Belum ada hasil analisis. Jalankan analisis terlebih dahulu.</p>
           </div>
         )}
       </section>
+
+      {deleteTargetId !== null ? (
+        <div className="history-delete-modal-overlay" onClick={() => setDeleteTargetId(null)}>
+          <div
+            className="history-delete-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="history-delete-modal-title"
+            aria-describedby="history-delete-modal-description"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="history-delete-modal-title" className="history-delete-modal-title">
+              Delete this history?
+            </h2>
+            <p
+              id="history-delete-modal-description"
+              className="history-delete-modal-description"
+            >
+              This action will permanently remove the selected analysis history item.
+            </p>
+            <div className="history-delete-modal-actions">
+              <button
+                type="button"
+                className="history-delete-modal-button history-delete-modal-button-secondary"
+                onClick={() => setDeleteTargetId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="history-delete-modal-button history-delete-modal-button-primary"
+                onClick={handleConfirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

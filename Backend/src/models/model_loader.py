@@ -1,5 +1,6 @@
-import tensorflow as tf
 import os
+from pathlib import Path
+import tensorflow as tf
 
 _model_cache = {}
 
@@ -13,11 +14,38 @@ def load_model(model_name="mobilenetv2.keras"):
     tf.keras.backend.clear_session()
 
     if model_name not in _model_cache:
-        model_path = os.path.join("src", "models", model_name)
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found: {model_path}")
-        _model_cache[model_name] = tf.keras.models.load_model(model_path)
-        print(f"Model {model_name} loaded successfully")
+        project_root = Path(__file__).resolve().parents[2]
+        env_model_path = os.getenv("MODEL_PATH", "").strip()
+        models_dir = project_root / "src" / "models"
+
+        candidate_paths = []
+        if env_model_path:
+            candidate_paths.append(Path(env_model_path))
+        candidate_paths.append(project_root / "src" / "models" / model_name)
+
+        # Fallback: if default model name is not present, use the first .keras model found.
+        if not env_model_path and model_name == "mobilenetv2.keras":
+            available_keras_models = sorted(models_dir.glob("*.keras"))
+            if available_keras_models:
+                candidate_paths.append(available_keras_models[0])
+
+        resolved_model_path = None
+        for candidate in candidate_paths:
+            normalized = candidate if candidate.is_absolute() else (project_root / candidate)
+            if normalized.exists():
+                resolved_model_path = normalized
+                break
+
+        if resolved_model_path is None:
+            searched = "\n".join([f"- {str((c if c.is_absolute() else (project_root / c)).resolve())}" for c in candidate_paths])
+            raise FileNotFoundError(
+                f"Model file not found: {model_name}\n"
+                f"Searched paths:\n{searched}\n"
+                "Set MODEL_PATH in Backend/.env or place model in Backend/src/models/"
+            )
+
+        _model_cache[model_name] = tf.keras.models.load_model(str(resolved_model_path))
+        print(f"Model loaded successfully from: {resolved_model_path}")
 
     return _model_cache[model_name]
 

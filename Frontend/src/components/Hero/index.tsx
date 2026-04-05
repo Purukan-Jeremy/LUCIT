@@ -9,6 +9,12 @@ function Hero() {
   const navigate = useNavigate();
 
   const handleStartDetection = () => {
+    const savedUser = localStorage.getItem("lucit_user");
+    if (!savedUser) {
+      window.dispatchEvent(new Event("lucit:open-login"));
+      return;
+    }
+
     const docWithTransition = document as DocumentWithViewTransition;
 
     if (docWithTransition.startViewTransition) {

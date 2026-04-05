@@ -1,6 +1,20 @@
 import React, { useEffect, useState } from "react";
 import "../../assets/style.css";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
+
+async function parseApiBody(response: Response) {
+  const rawText = await response.text();
+  if (!rawText) return {};
+
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    return { error: rawText.slice(0, 240) };
+  }
+}
+
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -9,6 +23,7 @@ interface LoginModalProps {
 
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -20,17 +35,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
   useEffect(() => {
     if (!isOpen) {
       setIsSignUp(false);
+      setShowPassword(false);
       setFormData({ fullName: "", email: "", password: "" });
       setMessage(null);
-      return;
     }
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
   }, [isOpen]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -45,7 +53,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
 
     if (isSignUp) {
       try {
-        const response = await fetch("http://localhost:8000/api/users", {
+        const response = await fetch(`${API_BASE_URL}/api/users`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -55,7 +63,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           }),
         });
 
-        const result = await response.json();
+        const result = await parseApiBody(response);
         if (response.ok) {
           setMessage({ type: "success", text: "Account created successfully! You can now login." });
           setIsSignUp(false);
@@ -64,14 +72,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           throw new Error(result.error || "Failed to sign up");
         }
       } catch (err) {
-        setMessage({ type: "error", text: err instanceof Error ? err.message : "Something went wrong" });
+        const text =
+          err instanceof TypeError
+            ? `Cannot reach backend at ${API_TARGET_LABEL}. Make sure backend is running.`
+            : err instanceof Error
+              ? err.message
+              : "Something went wrong";
+        setMessage({ type: "error", text });
       } finally {
         setIsLoading(false);
       }
     } else {
       // Logic for Login
       try {
-        const response = await fetch("http://localhost:8000/api/login", {
+        const response = await fetch(`${API_BASE_URL}/api/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -80,7 +94,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           }),
         });
 
-        const result = await response.json();
+        const result = await parseApiBody(response);
         if (response.ok && result.status === "success") {
           const userData = {
             fullname: result.user.fullname,
@@ -93,7 +107,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           throw new Error(result.message || "Invalid credentials");
         }
       } catch (err) {
-        setMessage({ type: "error", text: err instanceof Error ? err.message : "Invalid email or password" });
+        const text =
+          err instanceof TypeError
+            ? `Cannot reach backend at ${API_TARGET_LABEL}. Make sure backend is running.`
+            : err instanceof Error
+              ? err.message
+              : "Invalid email or password";
+        setMessage({ type: "error", text });
       } finally {
         setIsLoading(false);
       }
@@ -109,9 +129,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           &times;
         </button>
         
-        <h2 className="modal-title">{isSignUp ? "Create an Account" : "Login to LUCIT"}</h2>
+        <h2 className="modal-title">{isSignUp ? "Create an Account" : "Sign In"}</h2>
         <p className="modal-subtitle">
-          {isSignUp ? "Fill in the details to get started" : "Choose your preferred login method"}
+          {isSignUp ? "Fill in the details to get started" : "Enter your email and password to continue"}
         </p>
 
         {message && (
@@ -121,23 +141,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
         )}
 
         <div className="login-options">
-          {!isSignUp && (
-            <>
-              <button className="google-login-btn">
-                <img 
-                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
-                  alt="Google logo" 
-                  className="google-icon"
-                />
-                <span>Continue with Google</span>
-              </button>
-
-              <div className="divider">
-                <span className="divider-text">OR</span>
-              </div>
-            </>
-          )}
-
           <form className="manual-login-form" onSubmit={handleSubmit}>
             {isSignUp && (
               <div className="form-group">
@@ -167,18 +170,86 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
 
             <div className="form-group">
               <label htmlFor="password">Password</label>
-              <input 
-                type="password" 
-                id="password" 
-                placeholder={isSignUp ? "Create a password" : "Enter your password"} 
-                value={formData.password}
-                onChange={handleInputChange}
-                required 
-              />
+              <div className="password-input-wrap">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  placeholder={isSignUp ? "Create a password" : "Enter your password"}
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  title={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="password-toggle-icon"
+                    >
+                      <path
+                        d="M3 3L21 21"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M9.88 5.09A10.94 10.94 0 0112 4.91c5 0 8.27 4.19 9 5.09-.35.43-1.28 1.52-2.72 2.58"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M6.61 6.61C4.54 7.97 3.28 9.66 3 10c.73.9 4 5.09 9 5.09 1.5 0 2.86-.38 4.08-.96"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  ) : (
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="password-toggle-icon"
+                    >
+                      <path
+                        d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="3"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      />
+                    </svg>
+                  )}
+                </button>
+              </div>
             </div>
 
             <button type="submit" className="submit-btn" disabled={isLoading}>
-              {isLoading ? "Processing..." : (isSignUp ? "Sign Up" : "Login")}
+              {isLoading ? "Processing..." : (isSignUp ? "Sign Up" : "Sign In")}
             </button>
           </form>
 
@@ -188,9 +259,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
               <button 
                 type="button" 
                 className="toggle-mode-btn" 
-                onClick={() => setIsSignUp(!isSignUp)}
+                onClick={() => {
+                  setIsSignUp(!isSignUp);
+                  setShowPassword(false);
+                }}
               >
-                {isSignUp ? "Login here" : "Sign up here"}
+                {isSignUp ? "Sign in" : "Sign up here"}
               </button>
             </p>
           </div>
