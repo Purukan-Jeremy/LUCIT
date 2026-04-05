@@ -1,12 +1,18 @@
 import { useState, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
 import Header from "./components/Header";
 import Hero from "./components/Hero";
 import Footer from "./components/Footer";
 import AnalysisPage from "./pages/analysis";
 import HistoryPage from "./pages/history";
 import SplashScreen from "./components/SplashScreen";
-import ContactUs from "./components/ContactUs";
+import Features from "./components/Features";
 import AboutUs from "./components/AboutUs";
 
 function ScrollHandler() {
@@ -24,6 +30,22 @@ function ScrollHandler() {
   }, [location]);
 
   return null;
+}
+
+function AnalysisRouteGuard() {
+  const isLoggedIn = Boolean(localStorage.getItem("lucit_user"));
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      window.dispatchEvent(new Event("lucit:open-login"));
+    }
+  }, [isLoggedIn]);
+
+  if (!isLoggedIn) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <AnalysisPage />;
 }
 
 function App() {
@@ -63,13 +85,13 @@ function App() {
               <>
                 <Hero />
                 <AboutUs />
-                <ContactUs />
+                <Features />
               </>
             }
           />
 
           {/* Halaman Analysis (Tujuan saat tombol ditekan) */}
-          <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/analysis" element={<AnalysisRouteGuard />} />
           <Route path="/history" element={<HistoryPage />} />
         </Routes>
 
