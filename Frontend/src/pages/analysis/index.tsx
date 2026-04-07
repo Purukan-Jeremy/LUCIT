@@ -1,5 +1,42 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
+<<<<<<< Updated upstream
+=======
+import { hasActiveSession } from "../../utils/session";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
+const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
+type ChatMessage = { role: "user" | "assistant"; text: string };
+
+async function parseApiBody(response: Response) {
+  const rawText = await response.text();
+  if (!rawText) return {};
+
+  try {
+    return JSON.parse(rawText);
+  } catch {
+    return { error: rawText.slice(0, 240) };
+  }
+}
+
+function formatPredictionLabel(prediction?: string) {
+  switch ((prediction || "").trim()) {
+    case "Colon N":
+      return "Colon Normal";
+    case "Colon ACA":
+      return "Colon Adenocarcinoma";
+    case "Lung ACA":
+      return "Lung Adenocarcinoma";
+    case "Lung N":
+      return "Lung Normal";
+    case "Lung SCC":
+      return "Lung Squamous Cell Carcinoma";
+    default:
+      return prediction || "Unknown";
+  }
+}
+>>>>>>> Stashed changes
 
 const AnalysisPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -71,7 +108,7 @@ const AnalysisPage: React.FC = () => {
         body: formData,
       });
 
-      const data = await response.json();
+      const data = await parseApiBody(response);
 
       if (!response.ok || data.status === "error") {
         throw new Error(data.message || data.error || "Analysis failed");

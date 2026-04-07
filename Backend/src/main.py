@@ -1,10 +1,25 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from src.config.supabase import supabase
+<<<<<<< Updated upstream
 from src.controllers.prediction_controller import predict_image
 
 app = Flask(__name__)
 CORS(app)  
+=======
+from src.controllers.prediction_controller import ImageController
+from src.models.model_loader import ImageClassifier
+from src.routes.chatbot_routes import chatbot_bp
+
+app = Flask(__name__)
+CORS(app)  
+app.register_blueprint(chatbot_bp)
+
+try:
+    ImageClassifier.load_model()
+except Exception as preload_error:
+    print(f"Model preload skipped: {preload_error}")
+>>>>>>> Stashed changes
 
 @app.route("/", methods=["GET"])
 def root():
@@ -45,7 +60,7 @@ def predict():
     model_type = request.form.get("model_type", "classification")  
 
     try:
-        result = predict_image(file, model_type=model_type)
+        result = ImageController.predict_image(file, model_type=model_type)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
