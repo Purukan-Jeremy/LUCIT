@@ -1,24 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
-<<<<<<< Updated upstream
-=======
 import { hasActiveSession } from "../../utils/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
 const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
 type ChatMessage = { role: "user" | "assistant"; text: string };
-
-async function parseApiBody(response: Response) {
-  const rawText = await response.text();
-  if (!rawText) return {};
-
-  try {
-    return JSON.parse(rawText);
-  } catch {
-    return { error: rawText.slice(0, 240) };
-  }
-}
 
 function formatPredictionLabel(prediction?: string) {
   switch ((prediction || "").trim()) {
@@ -36,29 +23,30 @@ function formatPredictionLabel(prediction?: string) {
       return prediction || "Unknown";
   }
 }
->>>>>>> Stashed changes
 
 const AnalysisPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [selectedPreview, setSelectedPreview] = useState<string>("");
-  const [resultPreview, setResultPreview] = useState<string>("");
+  const [heatmapPreview, setHeatmapPreview] = useState<string>("");
+  const [overlayPreview, setOverlayPreview] = useState<string>("");
   const [isAnalyzed, setIsAnalyzed] = useState(false);
   const [modelType, setModelType] = useState<
     "none" | "classification" | "segmentation"
   >("none");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
-  const [chatMessages, setChatMessages] = useState<
-    { role: "user" | "assistant"; text: string }[]
-  >([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   const [predictionResult, setPredictionResult] = useState<{
     status?: string;
     prediction?: string;
     confidence?: number;
+    gradcam_heatmap?: string;
     gradcam_image?: string;
     segmentation_mask?: string;
     ai_description?: string;
+    warning?: string;
     error?: string;
     message?: string;
   } | null>(null);
@@ -66,15 +54,19 @@ const AnalysisPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [notice, setNotice] = useState<{ type: "info" | "error"; text: string } | null>(null);
+  const [modelSelectAttention, setModelSelectAttention] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const noticeTimeoutRef = useRef<number | null>(null);
+  const modelSelectTimeoutRef = useRef<number | null>(null);
 
   const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       setSelectedImage(file);
       setIsAnalyzed(false);
-      setResultPreview("");
+      setHeatmapPreview("");
+      setOverlayPreview("");
       setPredictionResult(null);
       setError("");
 
@@ -88,8 +80,104 @@ const AnalysisPage: React.FC = () => {
 
   const showNotice = (type: "info" | "error", text: string) => {
     setNotice({ type, text });
-    window.clearTimeout((showNotice as any)._t);
-    (showNotice as any)._t = window.setTimeout(() => setNotice(null), 3200);
+    if (noticeTimeoutRef.current) {
+      window.clearTimeout(noticeTimeoutRef.current);
+    }
+    noticeTimeoutRef.current = window.setTimeout(() => setNotice(null), 3200);
+  };
+
+  const triggerModelSelectAttention = () => {
+    if (modelType !== "none") return;
+    setModelSelectAttention(true);
+    if (modelSelectTimeoutRef.current) {
+      window.clearTimeout(modelSelectTimeoutRef.current);
+    }
+    modelSelectTimeoutRef.current = window.setTimeout(
+      () => setModelSelectAttention(false),
+      2000,
+    );
+  };
+
+  const inferVariant = (prediction?: string): "lung" | "colon" | "breast" | "unknown" => {
+    const text = (prediction || "").toLowerCase();
+    if (text.includes("lung")) return "lung";
+    if (text.includes("colon")) return "colon";
+    if (text.includes("breast")) return "breast";
+    return "unknown";
+  };
+
+  const saveAnalysisToHistory = (data: {
+    prediction?: string;
+    confidence?: number;
+    ai_description?: string;
+    gradcam_heatmap?: string;
+    gradcam_image?: string;
+    segmentation_mask?: string;
+  }) => {
+    const confidenceValue =
+      typeof data.confidence === "number"
+        ? `${(data.confidence * 100).toFixed(2)}%`
+        : "N/A";
+    const heatmapImage = data.gradcam_heatmap
+      ? `data:image/jpeg;base64,${data.gradcam_heatmap}`
+      : "";
+    const overlayImage = data.gradcam_image
+      ? `data:image/jpeg;base64,${data.gradcam_image}`
+      : data.segmentation_mask
+        ? `data:image/png;base64,${data.segmentation_mask}`
+        : "";
+
+    const entry = {
+      id: Date.now(),
+      prediction: formatPredictionLabel(data.prediction),
+      confidence: confidenceValue,
+      createdAt: new Date().toISOString(),
+      model: modelType === "classification" ? "Classification" : "Segmentation",
+      description: data.ai_description || "No AI description available.",
+      variant: inferVariant(data.prediction),
+      originalImage: selectedPreview,
+      heatmapImage,
+      overlayImage,
+    };
+
+    try {
+      const raw = localStorage.getItem(ANALYSIS_HISTORY_KEY);
+      const prev = raw ? JSON.parse(raw) : [];
+      const safePrev = Array.isArray(prev) ? prev : [];
+      localStorage.setItem(
+        ANALYSIS_HISTORY_KEY,
+        JSON.stringify([entry, ...safePrev].slice(0, 100)),
+      );
+    } catch (storageError) {
+      console.error("Failed to save history:", storageError);
+    }
+  };
+
+  const getDescriptionText = () => {
+    const text = (predictionResult?.ai_description || "").trim();
+    if (text) return text;
+
+    const prediction = formatPredictionLabel(predictionResult?.prediction);
+    const confidence = predictionResult?.confidence;
+    const confidenceText =
+      typeof confidence === "number" ? `${(confidence * 100).toFixed(2)}%` : "N/A";
+    const predictionLower = prediction.toLowerCase();
+    const riskPhrase =
+      predictionLower.includes("aca") ||
+      predictionLower.includes("scc") ||
+      predictionLower.includes("malignant")
+        ? "higher-risk malignant pattern"
+        : predictionLower.includes("benign")
+          ? "lower-risk benign pattern"
+          : "non-specific pattern";
+
+    return (
+      `Based on the model output, this sample is classified as ${prediction} with an estimated confidence of ${confidenceText}. ` +
+      `The extracted visual features are more consistent with a ${riskPhrase} compared with other classes in this model. ` +
+      "Although confidence is high, it does not represent absolute diagnostic certainty because prediction quality can be affected by slide preparation, staining variation, and scanner artifacts. " +
+      "This AI result should be interpreted as clinical decision-support and not as a standalone diagnosis. " +
+      "A final conclusion should combine pathology review, clinical correlation, and additional supporting examinations by a qualified specialist."
+    );
   };
 
   const sendImageToBackend = async (file: File) => {
@@ -103,12 +191,12 @@ const AnalysisPage: React.FC = () => {
       setIsLoading(true);
       setError("");
 
-      const response = await fetch("http://localhost:8000/api/predict", {
+      const response = await fetch(`${API_BASE_URL}/api/predict`, {
         method: "POST",
         body: formData,
       });
 
-      const data = await parseApiBody(response);
+      const data = await response.json();
 
       if (!response.ok || data.status === "error") {
         throw new Error(data.message || data.error || "Analysis failed");
@@ -116,17 +204,26 @@ const AnalysisPage: React.FC = () => {
 
       setPredictionResult(data);
 
-      if (data.gradcam_image) {
-        setResultPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
-      } else if (data.segmentation_mask) {
-        setResultPreview(`data:image/png;base64,${data.segmentation_mask}`);
+      if (data.gradcam_heatmap) {
+        setHeatmapPreview(`data:image/jpeg;base64,${data.gradcam_heatmap}`);
       }
 
+      if (data.gradcam_image) {
+        setOverlayPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
+      } else if (data.segmentation_mask) {
+        setOverlayPreview(`data:image/png;base64,${data.segmentation_mask}`);
+      }
+
+      saveAnalysisToHistory(data);
       setIsAnalyzed(true);
     } catch (error) {
       console.error("Error uploading image:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Error analyzing image";
+        error instanceof TypeError
+          ? `Cannot reach backend at ${API_TARGET_LABEL}. Make sure the backend server is running and CORS/network settings are correct.`
+          : error instanceof Error
+            ? error.message
+            : "Error analyzing image";
       setError(errorMessage);
       showNotice("error", `Error: ${errorMessage}`);
     } finally {
@@ -135,8 +232,15 @@ const AnalysisPage: React.FC = () => {
   };
 
   const handleStartAnalysis = async () => {
+    if (!hasActiveSession()) {
+      showNotice("info", "Please sign in first before starting detection.");
+      window.dispatchEvent(new Event("lucit:open-login"));
+      return;
+    }
+
     if (!selectedImage || !selectedPreview || modelType === "none") {
       showNotice("info", "Please select a model and upload an image first.");
+      triggerModelSelectAttention();
       return;
     }
 
@@ -146,7 +250,8 @@ const AnalysisPage: React.FC = () => {
   const handleReset = () => {
     setSelectedImage(null);
     setSelectedPreview("");
-    setResultPreview("");
+    setHeatmapPreview("");
+    setOverlayPreview("");
     setIsAnalyzed(false);
     setPredictionResult(null);
     setError("");
@@ -160,34 +265,82 @@ const AnalysisPage: React.FC = () => {
     }
   };
 
-  const handleSendChat = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    if (modelType !== "none") {
+      setModelSelectAttention(false);
+    }
+  }, [modelType]);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimeoutRef.current) {
+        window.clearTimeout(noticeTimeoutRef.current);
+      }
+      if (modelSelectTimeoutRef.current) {
+        window.clearTimeout(modelSelectTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("chat-lock", chatOpen);
+
+    return () => {
+      document.body.classList.remove("chat-lock");
+    };
+  }, [chatOpen]);
+
+  const handleSendChat = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isChatLoading) return;
+
     const message = chatInput.trim();
     if (!message) return;
 
-    setChatMessages((prev) => [
-      ...prev,
-      { role: "user", text: message },
-      {
-        role: "assistant",
-        text: "LLM is not connected yet. This is UI only.",
-      },
-    ]);
+    const historyForRequest = [...chatMessages, { role: "user", text: message }];
+    setChatMessages(historyForRequest);
     setChatInput("");
-  };
+    setIsChatLoading(true);
 
-  useEffect(() => {
-    if (!chatOpen) {
-      document.body.classList.remove("chat-lock");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          analysis_context: {
+            model_type: modelType,
+            prediction: predictionResult?.prediction,
+            confidence: predictionResult?.confidence,
+            ai_description: predictionResult?.ai_description,
+            warning: predictionResult?.warning,
+          },
+          chat_history: chatMessages,
+        }),
+      });
+
+      const rawText = await response.text();
+      let result: { status?: string; reply?: string; message?: string } = {};
+      try {
+        result = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        result = { status: "error", message: rawText || "Invalid server response" };
+      }
+
+      const assistantText =
+        response.ok && result.status === "success"
+          ? result.reply || "Maaf, saya tidak dapat menghasilkan jawaban saat ini."
+          : result.message || "Chatbot sedang tidak tersedia untuk sementara.";
+
+      setChatMessages((prev) => [...prev, { role: "assistant", text: assistantText }]);
+    } catch {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: "Chatbot sedang tidak tersedia untuk sementara." },
+      ]);
+    } finally {
+      setIsChatLoading(false);
     }
-  }, [chatOpen]);
-
-  const handleChatMouseEnter = () => {
-    document.body.classList.add("chat-lock");
-  };
-
-  const handleChatMouseLeave = () => {
-    document.body.classList.remove("chat-lock");
   };
 
   return (
@@ -237,6 +390,7 @@ const AnalysisPage: React.FC = () => {
                 if (modelType === "none") {
                   event.preventDefault();
                   showNotice("info", "Please select a model first.");
+                  triggerModelSelectAttention();
                 }
               }}
             >
@@ -256,7 +410,9 @@ const AnalysisPage: React.FC = () => {
               </div>
             </label>
 
-            <div className="model-select">
+            <div
+              className={`model-select ${modelSelectAttention ? "attention" : ""}`}
+            >
               <select
                 id="model-type"
                 className="model-dropdown"
@@ -283,13 +439,7 @@ const AnalysisPage: React.FC = () => {
               <img
                 src={selectedPreview}
                 alt="Selected preview"
-                style={{
-                  width: "100%",
-                  maxHeight: "200px",
-                  objectFit: "contain",
-                  borderRadius: "8px",
-                  border: "2px solid #ddd",
-                }}
+                className="selected-preview-image"
               />
             </div>
           )}
@@ -331,13 +481,9 @@ const AnalysisPage: React.FC = () => {
 
           {error && (
             <div
+              className="analysis-error-panel"
               style={{
                 marginTop: "1rem",
-                padding: "1rem",
-                backgroundColor: "#f8d7da",
-                color: "#721c24",
-                borderRadius: "8px",
-                fontSize: "0.9rem",
               }}
             >
               <strong>Error:</strong> {error}
@@ -346,47 +492,77 @@ const AnalysisPage: React.FC = () => {
         </div>
 
           <div className="card-right">
-            {isAnalyzed && modelType !== "none" && predictionResult ? (
+            {isLoading ? (
+              <div className="analysis-loading">
+                <div className="analysis-loading-spinner" aria-hidden="true" />
+                <div className="analysis-loading-text">Analyzing image...</div>
+              </div>
+            ) : isAnalyzed && modelType !== "none" && predictionResult ? (
               <div className="analysis-result">
                 <div className="result-summary-card">
-                  <div className="result-preview">
-                    {resultPreview ? (
-                      <img
-                        src={resultPreview}
-                        alt="Analysis result"
-                        className="result-preview-image"
-                        style={{
-                          width: "100%",
-                          height: "auto",
-                          borderRadius: "8px",
-                        }}
-                      />
-                    ) : (
-                      <p>No visualization available</p>
-                    )}
-                  </div>
-
                   <div className="result-metrics">
                     <h3 style={{ marginBottom: "0.5rem" }}>Analysis Results</h3>
-                    <p>
-                      <strong>Prediction:</strong>{" "}
-                      <span
-                        style={{
-                          color: predictionResult?.prediction?.includes("Benign")
-                            ? "#28a745"
-                            : "#dc3545",
-                          fontWeight: "bold",
-                        }}
-                      >
-                        {predictionResult?.prediction || "N/A"}
-                      </span>
-                    </p>
-                    <p>
-                      <strong>Confidence:</strong>{" "}
-                      {predictionResult?.confidence
-                        ? `${(predictionResult.confidence * 100).toFixed(2)}%`
-                        : "N/A"}
-                    </p>
+                    <div className="metrics-center">
+                      <p>
+                        <span className="metric-label">Prediction:</span>
+                        <span className="metric-value" style={{ color: "#ffffff" }}>
+                          {formatPredictionLabel(predictionResult?.prediction) || "N/A"}
+                        </span>
+                      </p>
+                      <p>
+                        <span className="metric-label">Confidence:</span>
+                        <span className="metric-value">
+                          {predictionResult?.confidence
+                            ? `${(predictionResult.confidence * 100).toFixed(2)}%`
+                            : "N/A"}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="result-visuals">
+                    <div className="result-visual-card">
+                      <div className="result-visual-title">Original Image</div>
+                      {selectedPreview ? (
+                        <img
+                          src={selectedPreview}
+                          alt="Original"
+                          className="result-visual-image"
+                        />
+                      ) : (
+                        <div className="result-visual-empty">No image</div>
+                      )}
+                    </div>
+
+                    <div className="result-visual-card">
+                      <div className="result-visual-title">Grad-CAM Heatmap</div>
+                      {heatmapPreview ? (
+                        <img
+                          src={heatmapPreview}
+                          alt="Grad-CAM heatmap"
+                          className="result-visual-image"
+                        />
+                      ) : (
+                        <div className="result-visual-empty">
+                          Heatmap not available
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="result-visual-card">
+                      <div className="result-visual-title">Grad-CAM Overlay</div>
+                      {overlayPreview ? (
+                        <img
+                          src={overlayPreview}
+                          alt="Grad-CAM overlay"
+                          className="result-visual-image"
+                        />
+                      ) : (
+                        <div className="result-visual-empty">
+                          Overlay not available
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -455,8 +631,7 @@ const AnalysisPage: React.FC = () => {
             </h3>
 
             <div className="analysis-description-text">
-              {predictionResult?.ai_description ||
-                "AI description is being generated..."}
+              {getDescriptionText()}
             </div>
 
             <div className="analysis-disclaimer">
@@ -470,8 +645,6 @@ const AnalysisPage: React.FC = () => {
 
       <div
         className={`chatbot-sidebar ${chatOpen ? "open" : ""}`}
-        onMouseEnter={handleChatMouseEnter}
-        onMouseLeave={handleChatMouseLeave}
       >
         <div className="chatbot-header">
           <div>AI Consultation Chat</div>
@@ -493,30 +666,48 @@ const AnalysisPage: React.FC = () => {
               with the AI assistant.
             </div>
           ) : (
-            chatMessages.map((message, index) => (
-              <div
-                key={`${message.role}-${index}`}
-                className={`chatbot-message ${message.role}`}
-              >
-                <p>{message.text}</p>
-              </div>
-            ))
+            <>
+              {chatMessages.map((message, index) => (
+                <div
+                  key={`${message.role}-${index}`}
+                  className={`chatbot-message ${message.role}`}
+                >
+                  <p>{message.text}</p>
+                </div>
+              ))}
+              {isChatLoading ? (
+                <div className="chatbot-message assistant loading" aria-live="polite">
+                  <div className="chatbot-typing" aria-label="Assistant is typing">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
 
         <form className="chatbot-input" onSubmit={handleSendChat}>
           <input
             type="text"
-            placeholder="Type your question..."
+            placeholder={isChatLoading ? "Waiting for assistant response..." : "Type your question..."}
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
+            disabled={isChatLoading}
           />
-          <button type="submit">Send</button>
+          <button type="submit" disabled={isChatLoading}>
+            {isChatLoading ? "Sending..." : "Send"}
+          </button>
         </form>
       </div>
 
       {chatOpen && (
-        <div className="chatbot-backdrop" aria-hidden="true" />
+        <div
+          className="chatbot-backdrop"
+          aria-hidden="true"
+          onClick={() => setChatOpen(false)}
+        />
       )}
     </div>
   );

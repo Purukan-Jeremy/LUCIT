@@ -2,25 +2,17 @@ import google.generativeai as genai
 import base64
 import json
 import hashlib
-import time
-from src.config.settings import GEMINI_API_KEY
+from io import BytesIO
+import numpy as np
+from PIL import Image
+from src.config.settings import GEMINI_API_KEY, GEMINI_DESCRIPTION_MODEL
 
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")  
-
+_genai_configured = False
+_description_model_cache = {}
 validation_cache = {}
+description_cache = {}
 
-last_request_time = 0
 
-<<<<<<< Updated upstream
-MIN_REQUEST_INTERVAL = 3
-
-def validate_histopathology(image_bytes):
-
-    global last_request_time
-
-    image_hash = hashlib.md5(image_bytes).hexdigest()
-=======
 def _candidate_models():
     preferred = (GEMINI_DESCRIPTION_MODEL or "").strip()
     models = [
@@ -30,6 +22,20 @@ def _candidate_models():
         "gemini-1.5-pro",
     ]
     return [m for i, m in enumerate(models) if m and m not in models[:i]]
+
+
+def get_description_model(model_name: str | None = None):
+    global _genai_configured
+
+    if not _genai_configured:
+        genai.configure(api_key=GEMINI_API_KEY)
+        _genai_configured = True
+
+    resolved_name = model_name or GEMINI_DESCRIPTION_MODEL
+    if resolved_name not in _description_model_cache:
+        _description_model_cache[resolved_name] = genai.GenerativeModel(resolved_name)
+
+    return _description_model_cache[resolved_name]
 
 
 def _encode_image_for_gemini(image_bytes: bytes, max_side: int = 768, quality: int = 82) -> str:
@@ -57,7 +63,7 @@ def _generate_with_fallback(prompt: str, image_base64: str):
     last_error = None
     for model_name in _candidate_models():
         try:
-            response = ImageValidator.get_description_model(model_name).generate_content(
+            response = get_description_model(model_name).generate_content(
                 [
                     prompt,
                     {
@@ -166,113 +172,36 @@ def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
             "validation_status": "heuristic_failed",
         }
 
-class ImageValidator:
-    @staticmethod
-    def get_description_model(model_name: str | None = None):
-        global _genai_configured
->>>>>>> Stashed changes
+def validate_histopathology(image_bytes):
+    image_hash = hashlib.md5(image_bytes).hexdigest()
 
-        if not _genai_configured:
-            genai.configure(api_key=GEMINI_API_KEY)
-            _genai_configured = True
-
-<<<<<<< Updated upstream
-    current_time = time.time()
-
-    if current_time - last_request_time < MIN_REQUEST_INTERVAL:
-        print("Skipping Gemini validation (cooldown)")
-        return {
-            "is_histopathology": True,
-            "organ": "unknown"
-        }
-
-    last_request_time = current_time
+    if image_hash in validation_cache:
+        print("Using cached validation")
+        return validation_cache[image_hash]
 
     try:
+        image_base64 = _encode_image_for_gemini(image_bytes, max_side=640, quality=74)
 
-        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-=======
-        resolved_name = model_name or GEMINI_DESCRIPTION_MODEL
-        if resolved_name not in _description_model_cache:
-            _description_model_cache[resolved_name] = genai.GenerativeModel(resolved_name)
->>>>>>> Stashed changes
+        prompt = """
+        Analyze this medical image.
 
-        return _description_model_cache[resolved_name]
-
-    @staticmethod
-    def validate_histopathology(image_bytes):
-        image_hash = hashlib.md5(image_bytes).hexdigest()
-
-        if image_hash in validation_cache:
-            print("Using cached validation")
-            return validation_cache[image_hash]
-
-        try:
-            image_base64 = _encode_image_for_gemini(image_bytes, max_side=640, quality=74)
-
-            prompt = """
-            Analyze this medical image.
-
-            Answer ONLY in JSON format:
-            {
-                "is_histopathology": true/false,
-                "organ": "lung" or "colon" or "unknown"
-            }
-            """
-
-            response, used_model = _generate_with_fallback(prompt, image_base64)
-
-            text = response.text.strip()
-            text = text.replace("```json", "").replace("```", "").strip()
-
-            result = json.loads(text)
-            result["is_histopathology"] = bool(result.get("is_histopathology", False))
-            result["organ"] = str(result.get("organ", "unknown")).lower()
-            result["validation_status"] = "ok"
-            print(f"Validation generated using Gemini model: {used_model}")
-
-            validation_cache[image_hash] = result
-
-            return result
-
-        except Exception as e:
-            print("Gemini validation failed:", e)
-            fallback_result = _heuristic_histopathology_check(image_bytes)
-            print(f"Heuristic validation result: {fallback_result}")
-            return fallback_result
-
-    @staticmethod
-    def generate_ai_description(image_bytes, prediction: str, confidence: float, gradcam_base64: str = None) -> str:
+        Answer ONLY in JSON format:
+        {
+            "is_histopathology": true/false,
+            "organ": "lung" or "colon" or "unknown"
+        }
         """
-        Generate AI description menggunakan Gemini API
-        """
-        if not GEMINI_API_KEY:
-            print("Warning: GEMINI_API_KEY not configured")
-            return "AI description unavailable: API key not configured"
 
-<<<<<<< Updated upstream
-        response = model.generate_content(
-            [
-                prompt,
-                {
-                    "mime_type": "image/jpeg",
-                    "data": image_base64,
-                },
-            ]
-        )
-=======
-        image_hash = hashlib.md5(image_bytes).hexdigest()
-        cache_key = f"{image_hash}:{prediction}:{confidence:.6f}"
-        if cache_key in description_cache:
-            print("Using cached AI description")
-            return description_cache[cache_key]
->>>>>>> Stashed changes
+        response, used_model = _generate_with_fallback(prompt, image_base64)
 
-        try:
-            image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
+        text = response.text.strip()
+        text = text.replace("```json", "").replace("```", "").strip()
 
-<<<<<<< Updated upstream
         result = json.loads(text)
+        result["is_histopathology"] = bool(result.get("is_histopathology", False))
+        result["organ"] = str(result.get("organ", "unknown")).lower()
+        result["validation_status"] = "ok"
+        print(f"Validation generated using Gemini model: {used_model}")
 
         validation_cache[image_hash] = result
 
@@ -280,12 +209,10 @@ class ImageValidator:
 
     except Exception as e:
 
-        print("Gemini quota exceeded:", e)
-
-        return {
-            "is_histopathology": True,
-            "organ": "unknown"
-        }
+        print("Gemini validation failed:", e)
+        fallback_result = _heuristic_histopathology_check(image_bytes)
+        print(f"Heuristic validation result: {fallback_result}")
+        return fallback_result
 
 
 def generate_ai_description(image_bytes, prediction: str, confidence: float, gradcam_base64: str = None) -> str:
@@ -305,14 +232,17 @@ def generate_ai_description(image_bytes, prediction: str, confidence: float, gra
     if not GEMINI_API_KEY:
         print("Warning: GEMINI_API_KEY not configured")
         return "AI description unavailable: API key not configured"
-    
+
+    image_hash = hashlib.md5(image_bytes).hexdigest()
+    cache_key = f"{image_hash}:{prediction}:{confidence:.6f}"
+    if cache_key in description_cache:
+        print("Using cached AI description")
+        return description_cache[cache_key]
+
     try:
-        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-        
+        image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
+
         prompt = f"""Anda adalah asisten AI medis yang ahli dalam analisis histopatologi.
-=======
-            prompt = f"""Anda adalah asisten AI medis yang ahli dalam analisis histopatologi.
->>>>>>> Stashed changes
 
 Saya telah menganalisis gambar histopatologi dengan hasil berikut:
 - Prediksi: {prediction}
@@ -320,74 +250,29 @@ Saya telah menganalisis gambar histopatologi dengan hasil berikut:
 
 Tolong analisis gambar histopatologi ini dan berikan deskripsi medis yang detail dalam Bahasa Indonesia. Jawab HANYA dalam Bahasa Indonesia, dalam paragraf yang mengalir, tanpa numbering atau bullets. Panjang total: sekitar 12-15 kalimat."""
 
-<<<<<<< Updated upstream
-        response = model.generate_content(
-            [
-                prompt,
-                {
-                    "mime_type": "image/jpeg",
-                    "data": image_base64,
-                },
-            ]
+        response, used_model = _generate_with_fallback(prompt, image_base64)
+        
+        description = (response.text or "").strip()
+        description = description.replace("**", "").replace("*", "").strip()
+
+        if not description:
+            print(
+                f"Gemini returned empty description using model: {used_model}. "
+                "Falling back to local description."
+            )
+            return _build_local_description(prediction=prediction, confidence=confidence)
+
+        print(
+            f"AI Description generated successfully ({len(description)} characters) "
+            f"using model: {used_model}"
         )
-        
-        description = response.text.strip()
-        
-        description = description.replace("**", "").replace("*", "")
-        
-        print(f"AI Description generated successfully ({len(description)} characters)")
+        description_cache[cache_key] = description
         return description
     
     except Exception as e:
         print(f"Error generating AI description: {str(e)}")
         import traceback
         traceback.print_exc()
-        
-        return "AI description generation failed"
-=======
-            response, used_model = _generate_with_fallback(prompt, image_base64)
 
-            description = (response.text or "").strip()
-            description = description.replace("**", "").replace("*", "").strip()
-
-            if not description:
-                print(
-                    f"Gemini returned empty description using model: {used_model}. "
-                    "Falling back to local description."
-                )
-                return _build_local_description(prediction=prediction, confidence=confidence)
-
-            print(
-                f"AI Description generated successfully ({len(description)} characters) "
-                f"using model: {used_model}"
-            )
-            description_cache[cache_key] = description
-            return description
-
-        except Exception as e:
-            print(f"Error generating AI description: {str(e)}")
-            import traceback
-            traceback.print_exc()
-
-            return _build_local_description(prediction=prediction, confidence=confidence)
-
-
-def get_description_model(model_name: str | None = None):
-    return ImageValidator.get_description_model(model_name)
-
-
-def validate_histopathology(image_bytes):
-    return ImageValidator.validate_histopathology(image_bytes)
-
-
-def generate_ai_description(image_bytes, prediction: str, confidence: float, gradcam_base64: str = None) -> str:
-    return ImageValidator.generate_ai_description(
-        image_bytes=image_bytes,
-        prediction=prediction,
-        confidence=confidence,
-        gradcam_base64=gradcam_base64,
-    )
-
-
-HistopathologyAIService = ImageValidator
->>>>>>> Stashed changes
+        # Always return a useful description even if Gemini is unavailable.
+        return _build_local_description(prediction=prediction, confidence=confidence)

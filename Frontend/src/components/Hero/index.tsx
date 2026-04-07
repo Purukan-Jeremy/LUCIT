@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { hasActiveSession } from "../../utils/session";
 // Pastikan CSS Hero sudah terhubung (biasanya via global style.css)
 
 type DocumentWithViewTransition = Document & {
@@ -9,6 +10,11 @@ function Hero() {
   const navigate = useNavigate();
 
   const handleStartDetection = () => {
+    if (!hasActiveSession()) {
+      window.dispatchEvent(new Event("lucit:open-login"));
+      return;
+    }
+
     const docWithTransition = document as DocumentWithViewTransition;
 
     if (docWithTransition.startViewTransition) {
