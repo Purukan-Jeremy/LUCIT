@@ -1,11 +1,13 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from src.config.supabase import supabase
-from src.controllers.prediction_controller import predict_image
+from src.config.settings import FLASK_SECRET_KEY
+from src.controllers.prediction_controller import filter_history, get_history, predict_image
 from src.models.model_loader import load_model
 from src.routes.chatbot_routes import chatbot_bp
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = FLASK_SECRET_KEY
 CORS(app)  
 app.register_blueprint(chatbot_bp)
 
@@ -29,8 +31,8 @@ def test_supabase():
 @app.route("/api/users", methods=["GET"])
 def get_users():
     try:
-        from src.controllers.user_controller import get_users as get_users_controller
-        users = get_users_controller()
+        from src.controllers.user_controller import UserController
+        users = UserController.get_users()
         return jsonify(users)
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
@@ -46,9 +48,11 @@ def create_user():
         if not fullname or not email or not password:
             return jsonify({"status": "error", "error": "fullname, email, and password are required"}), 400
 
-        from src.controllers.user_controller import create_user as create_user_controller
-        result = create_user_controller(data)
-        return jsonify({"status": "success", "data": result}), 201
+        from src.controllers.user_controller import SignUpController
+        result = SignUpController.sign_up(data)
+        if result.get("status") == "success":
+            return jsonify(result), 201
+        return jsonify(result), 400
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
 
@@ -61,8 +65,30 @@ def login():
         if not email or not password:
             return jsonify({"status": "error", "message": "email and password are required"}), 400
 
-        from src.controllers.user_controller import login_user
-        result = login_user(data)
+        from src.controllers.user_controller import SignInController
+        result = SignInController.sign_in(data)
+        if result.get("status") == "success":
+            return jsonify(result), 200
+        return jsonify(result), 401
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    try:
+        from src.controllers.user_controller import SignOutController
+        result = SignOutController.sign_out()
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/session/check", methods=["GET"])
+def check_session():
+    try:
+        from src.controllers.user_controller import SessionCheckController
+        result = SessionCheckController.check_session()
         if result.get("status") == "success":
             return jsonify(result), 200
         return jsonify(result), 401
@@ -87,6 +113,17 @@ def predict():
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/history", methods=["GET"])
+def history():
+    try:
+        query = request.args.get("q", "")
+        if query.strip():
+            return jsonify(filter_history(query)), 200
+        return jsonify(get_history()), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)

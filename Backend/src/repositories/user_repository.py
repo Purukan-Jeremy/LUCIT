@@ -1,3 +1,5 @@
+from flask import session
+
 from src.config.supabase import supabase
 
 
@@ -17,6 +19,16 @@ class UserRepository:
         return response.data
 
     @staticmethod
+    def find_user_by_email(email):
+        response = (
+            supabase.table("tbl_users")
+            .select("*")
+            .eq("email", email)
+            .execute()
+        )
+        return response.data
+
+    @staticmethod
     def find_user_by_credentials(email, password):
         response = (
             supabase.table("tbl_users")
@@ -26,3 +38,22 @@ class UserRepository:
             .execute()
         )
         return response.data
+
+
+class SessionRepository:
+    @staticmethod
+    def delete_session():
+        removed_user = session.pop("user", None)
+        return {
+            "deleted": removed_user is not None,
+            "session_key": "user",
+        }
+
+    @staticmethod
+    def check_active_session():
+        current_user = session.get("user")
+        return {
+            "active": current_user is not None,
+            "session_key": "user",
+            "user": current_user,
+        }

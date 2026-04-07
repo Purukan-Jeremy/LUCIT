@@ -7,14 +7,17 @@ from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from PIL import Image
 
-from src.models.model_loader import ImageClassifier
+from src.models.model_loader import load_model
 from src.repositories.analysis_repository import ResultRepository
 from src.services.gradcam_service import (
     get_last_conv_layer,
     make_gradcam_heatmap,
     overlay_heatmap,
 )
-from src.services.ai_validator_service import ImageValidator
+from src.services.ai_validator_service import (
+    generate_ai_description,
+    validate_histopathology,
+)
 
 DEFAULT_CLASS_NAMES = ["Colon ACA", "Colon Benign", "Lung ACA", "Lung Benign", "Lung SCC"]
 _gradcam_executor = ThreadPoolExecutor(max_workers=2)
@@ -91,7 +94,7 @@ class ImageController:
         contents = file.read()
 
         print("Validating image with Gemini...")
-        validation = ImageValidator.validate_histopathology(contents)
+        validation = validate_histopathology(contents)
         print("Validation result:", validation)
 
         if not validation.get("is_histopathology", False):
@@ -101,7 +104,7 @@ class ImageController:
             }
 
         if model_type == "classification":
-            model = ImageClassifier.load_model()
+            model = load_model()
         elif model_type == "segmentation":
             return {"status": "error", "message": "Segmentation belum tersedia"}
         else:
@@ -160,7 +163,7 @@ class ImageController:
 
         print("Generating AI description...")
         ai_description_future = _gradcam_executor.submit(
-            ImageValidator.generate_ai_description,
+            generate_ai_description,
             image_bytes=contents,
             prediction=predicted_class,
             confidence=confidence,
@@ -247,8 +250,23 @@ class ImageController:
         return ResultRepository.store_analysis_result(result)
 
 
+class HistoryController:
+    @staticmethod
+    def get_history():
+        return {
+            "status": "success",
+            "data": ResultRepository.get_history(),
+        }
+
+    @staticmethod
+    def filter_history(query):
+        return {
+            "status": "success",
+            "data": ResultRepository.filter_history(query),
+        }
+
+
 def predict_image(file, model_type="classification"):
-<<<<<<< Updated upstream
     """
     Fungsi prediksi gambar histopatologi.
     model_type: "classification" atau "segmentation"
@@ -414,9 +432,15 @@ def predict_image(file, model_type="classification"):
         "ai_description": ai_description,
         "warning": low_confidence_warning,
     }
-=======
+
+
+def get_history():
+    return HistoryController.get_history()
+
+
+def filter_history(query):
+    return HistoryController.filter_history(query)
     return ImageController.predict_image(file, model_type=model_type)
 
 
 AnalysisController = ImageController
->>>>>>> Stashed changes
