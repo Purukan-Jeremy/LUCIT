@@ -37,7 +37,13 @@ function Features() {
   return (
     <section className="features-section" id="features">
       <div className="features-shell">
-        <h2 className="features-heading">Features</h2>
+        <div className="features-heading-block">
+          <h2 className="features-heading">Features</h2>
+          <p className="features-intro">
+            Main tools in LUCIT for histopathology analysis, result review,
+            and guided interpretation.
+          </p>
+        </div>
 
         <div className="features-grid">
           {featureItems.map((item) => (

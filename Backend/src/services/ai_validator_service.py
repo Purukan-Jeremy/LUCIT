@@ -2,12 +2,15 @@ import google.generativeai as genai
 import base64
 import json
 import hashlib
-import time
-import os
 from io import BytesIO
 import numpy as np
 from PIL import Image
 from src.config.settings import GEMINI_API_KEY, GEMINI_DESCRIPTION_MODEL
+
+_genai_configured = False
+_description_model_cache = {}
+validation_cache = {}
+description_cache = {}
 
 
 def _candidate_models():
@@ -22,8 +25,38 @@ def _candidate_models():
 
 
 def get_description_model(model_name: str | None = None):
-    genai.configure(api_key=GEMINI_API_KEY)
-    return genai.GenerativeModel(model_name or GEMINI_DESCRIPTION_MODEL)
+    global _genai_configured
+
+    if not _genai_configured:
+        genai.configure(api_key=GEMINI_API_KEY)
+        _genai_configured = True
+
+    resolved_name = model_name or GEMINI_DESCRIPTION_MODEL
+    if resolved_name not in _description_model_cache:
+        _description_model_cache[resolved_name] = genai.GenerativeModel(resolved_name)
+
+    return _description_model_cache[resolved_name]
+
+
+def _encode_image_for_gemini(image_bytes: bytes, max_side: int = 768, quality: int = 82) -> str:
+    image = Image.open(BytesIO(image_bytes)).convert("RGB")
+    width, height = image.size
+    longest_side = max(width, height)
+
+    if longest_side > max_side:
+        scale = max_side / float(longest_side)
+        resized = (
+            max(1, int(round(width * scale))),
+            max(1, int(round(height * scale))),
+        )
+        resample_method = (
+            Image.Resampling.LANCZOS if hasattr(Image, "Resampling") else Image.LANCZOS
+        )
+        image = image.resize(resized, resample_method)
+
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=quality, optimize=True)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 def _generate_with_fallback(prompt: str, image_base64: str):
@@ -79,6 +112,22 @@ def _build_local_description(prediction: str, confidence: float) -> str:
         else "jaringan yang dianalisis"
     )
 
+    return (
+        f"Berdasarkan hasil analisis model, sampel diprediksi sebagai {label} "
+        f"dengan tingkat keyakinan sekitar {confidence_pct:.2f}%. Temuan ini menunjukkan bahwa "
+        f"pola visual yang dominan pada {organ_text} lebih konsisten dengan karakteristik kelas tersebut "
+        f"dibandingkan kelas lain dalam model yang sama. Secara umum, pola morfologi yang dikenali model "
+        f"menunjukkan kecenderungan risiko yang {risk_text}, sehingga hasil ini dapat digunakan sebagai "
+        f"indikator awal dalam proses telaah klinis. Nilai confidence yang tinggi menandakan konsistensi "
+        f"prediksi pada citra masukan, tetapi confidence bukan ukuran kepastian diagnosis absolut karena "
+        f"masih dipengaruhi kualitas preparat, variasi pewarnaan, artefak gambar, dan distribusi data latih model. "
+        f"Dalam praktiknya, interpretasi hasil AI sebaiknya dibaca bersama temuan mikroskopis lain, konteks klinis pasien, "
+        f"serta informasi laboratorium atau penunjang yang relevan agar keputusan medis lebih komprehensif. "
+        f"Hasil ini bersifat pendukung dan tidak menggantikan diagnosis medis final oleh dokter. "
+        f"{recommendation} Sebagai langkah berikut, pertimbangkan evaluasi komparatif pada area jaringan lain, "
+        f"review ulang slide oleh ahli patologi, dan pemantauan berkala bila dibutuhkan sesuai kondisi klinis."
+    )
+
 
 def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
     """
@@ -89,10 +138,6 @@ def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
         # Downsample for speed/stability.
         image = image.resize((256, 256))
-        rgb = np.array(image, dtype=np.uint8)
-
-        # Convert RGB -> HSV in OpenCV-like ranges manually.
-        # Use Pillow conversion for simplicity and reliability.
         hsv = np.array(image.convert("HSV"), dtype=np.uint8)
         h = hsv[..., 0]  # 0..255
         s = hsv[..., 1]
@@ -127,50 +172,15 @@ def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
             "validation_status": "heuristic_failed",
         }
 
-    return (
-        f"Berdasarkan hasil analisis model, sampel diprediksi sebagai {label} "
-        f"dengan tingkat keyakinan sekitar {confidence_pct:.2f}%. Temuan ini menunjukkan bahwa "
-        f"pola visual yang dominan pada {organ_text} lebih konsisten dengan karakteristik kelas tersebut "
-        f"dibandingkan kelas lain dalam model yang sama. Secara umum, pola morfologi yang dikenali model "
-        f"menunjukkan kecenderungan risiko yang {risk_text}, sehingga hasil ini dapat digunakan sebagai "
-        f"indikator awal dalam proses telaah klinis. Nilai confidence yang tinggi menandakan konsistensi "
-        f"prediksi pada citra masukan, tetapi confidence bukan ukuran kepastian diagnosis absolut karena "
-        f"masih dipengaruhi kualitas preparat, variasi pewarnaan, artefak gambar, dan distribusi data latih model. "
-        f"Dalam praktiknya, interpretasi hasil AI sebaiknya dibaca bersama temuan mikroskopis lain, konteks klinis pasien, "
-        f"serta informasi laboratorium/penunjang yang relevan agar keputusan medis lebih komprehensif. "
-        f"Hasil ini bersifat pendukung dan tidak menggantikan diagnosis medis final oleh dokter. "
-        f"{recommendation} Sebagai langkah berikut, pertimbangkan evaluasi komparatif pada area jaringan lain, "
-        f"review ulang slide oleh ahli patologi, dan pemantauan berkala bila dibutuhkan sesuai kondisi klinis."
-    )
-
-validation_cache = {}
-
-last_request_time = 0
-
-MIN_REQUEST_INTERVAL = 3
-
 def validate_histopathology(image_bytes):
-
-    global last_request_time
-
     image_hash = hashlib.md5(image_bytes).hexdigest()
 
     if image_hash in validation_cache:
         print("Using cached validation")
         return validation_cache[image_hash]
 
-    current_time = time.time()
-
-    if current_time - last_request_time < MIN_REQUEST_INTERVAL:
-        # Keep a very short cooldown to reduce duplicate calls, but do not auto-approve.
-        wait_seconds = MIN_REQUEST_INTERVAL - (current_time - last_request_time)
-        print(f"Validation cooldown active ({wait_seconds:.2f}s). Continuing with strict validation.")
-
-    last_request_time = current_time
-
     try:
-
-        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+        image_base64 = _encode_image_for_gemini(image_bytes, max_side=640, quality=74)
 
         prompt = """
         Analyze this medical image.
@@ -222,10 +232,16 @@ def generate_ai_description(image_bytes, prediction: str, confidence: float, gra
     if not GEMINI_API_KEY:
         print("Warning: GEMINI_API_KEY not configured")
         return "AI description unavailable: API key not configured"
-    
+
+    image_hash = hashlib.md5(image_bytes).hexdigest()
+    cache_key = f"{image_hash}:{prediction}:{confidence:.6f}"
+    if cache_key in description_cache:
+        print("Using cached AI description")
+        return description_cache[cache_key]
+
     try:
-        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-        
+        image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
+
         prompt = f"""Anda adalah asisten AI medis yang ahli dalam analisis histopatologi.
 
 Saya telah menganalisis gambar histopatologi dengan hasil berikut:
@@ -250,6 +266,7 @@ Tolong analisis gambar histopatologi ini dan berikan deskripsi medis yang detail
             f"AI Description generated successfully ({len(description)} characters) "
             f"using model: {used_model}"
         )
+        description_cache[cache_key] = description
         return description
     
     except Exception as e:

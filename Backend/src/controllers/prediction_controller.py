@@ -3,6 +3,7 @@ import cv2
 import base64
 import os
 import tensorflow as tf
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from PIL import Image
 
@@ -15,6 +16,7 @@ from src.services.gradcam_service import (
 from src.services.ai_validator_service import (validate_histopathology,generate_ai_description)
 
 DEFAULT_CLASS_NAMES = ["Colon ACA", "Colon Benign", "Lung ACA", "Lung Benign", "Lung SCC"]
+_gradcam_executor = ThreadPoolExecutor(max_workers=2)
 
 
 def _resolve_target_size(model):
@@ -115,7 +117,7 @@ def predict_image(file, model_type="classification"):
     image_array = np.array(image)
     img_array = _preprocess_image(image_array, model)
 
-    predictions = model.predict(img_array)
+    predictions = model.predict(img_array, verbose=0)
 
     if isinstance(predictions, list):
         predictions = predictions[0]
@@ -157,8 +159,16 @@ def predict_image(file, model_type="classification"):
         )
 
  
-    try:
+    print("Generating AI description...")
+    ai_description_future = _gradcam_executor.submit(
+        generate_ai_description,
+        image_bytes=contents,
+        prediction=predicted_class,
+        confidence=confidence,
+        gradcam_base64=None,
+    )
 
+    try:
         last_conv_layer_name = get_last_conv_layer(model)
 
         heatmap = make_gradcam_heatmap(
@@ -185,7 +195,6 @@ def predict_image(file, model_type="classification"):
         print("Grad-CAM generated successfully")
 
     except Exception as e:
-
         print(f"Grad-CAM error: {str(e)}")
 
         import traceback
@@ -197,15 +206,7 @@ def predict_image(file, model_type="classification"):
         gradcam_base64 = base64.b64encode(buffer).decode("utf-8")
         heatmap_base64 = None
 
- 
-    print("Generating AI description...")
-
-    ai_description = generate_ai_description(
-        image_bytes=contents,
-        prediction=predicted_class,
-        confidence=confidence,
-        gradcam_base64=gradcam_base64
-    )
+    ai_description = ai_description_future.result()
 
     if not isinstance(ai_description, str) or not ai_description.strip():
         risk_phrase = (

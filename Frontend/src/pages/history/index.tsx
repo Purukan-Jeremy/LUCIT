@@ -1,8 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import "../../assets/style.css";
+import { readStoredUser } from "../../utils/session";
 
 const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
-const USER_STORAGE_KEY = "lucit_user";
+
+function formatPredictionLabel(prediction: string) {
+  switch (prediction.trim()) {
+    case "Colon N":
+      return "Colon Normal";
+    case "Colon ACA":
+      return "Colon Adenocarcinoma";
+    case "Lung ACA":
+      return "Lung Adenocarcinoma";
+    case "Lung N":
+      return "Lung Normal";
+    case "Lung SCC":
+      return "Lung Squamous Cell Carcinoma";
+    default:
+      return prediction;
+  }
+}
 
 type HistoryItem = {
   id: number;
@@ -59,9 +76,7 @@ function HistoryPage() {
   useEffect(() => {
     const syncUser = () => {
       try {
-        const rawUser = localStorage.getItem(USER_STORAGE_KEY);
-        const parsedUser = rawUser ? JSON.parse(rawUser) : null;
-        setUserFullname(parsedUser?.fullname || "Guest");
+        setUserFullname(readStoredUser()?.fullname || "Guest");
       } catch (error) {
         console.error("Failed to load current user:", error);
         setUserFullname("Guest");
@@ -112,7 +127,7 @@ function HistoryPage() {
 
     return items.filter((item) =>
       [
-        item.prediction,
+        formatPredictionLabel(item.prediction),
         item.confidence,
         formatDate(item.createdAt),
         item.model,
@@ -198,7 +213,7 @@ function HistoryPage() {
                     <span className="history-card-label">Prediction</span>
                     <span className="history-card-separator">:</span>
                     <strong className="history-card-value">
-                      {renderHighlightedText(item.prediction, query)}
+                      {renderHighlightedText(formatPredictionLabel(item.prediction), query)}
                     </strong>
                   </div>
 
@@ -257,7 +272,7 @@ function HistoryPage() {
                 <section
                   className="history-detail"
                   id={`history-detail-${item.id}`}
-                  aria-label={`Detail for ${item.prediction}`}
+                  aria-label={`Detail for ${formatPredictionLabel(item.prediction)}`}
                 >
                   <div className="history-detail-gallery">
                     <div className="history-detail-gallery-item">

@@ -11,8 +11,6 @@ def load_model(model_name="mobilenetv2.keras"):
     """
     global _model_cache
 
-    tf.keras.backend.clear_session()
-
     if model_name not in _model_cache:
         project_root = Path(__file__).resolve().parents[2]
         env_model_path = os.getenv("MODEL_PATH", "").strip()
@@ -44,7 +42,10 @@ def load_model(model_name="mobilenetv2.keras"):
                 "Set MODEL_PATH in Backend/.env or place model in Backend/src/models/"
             )
 
-        _model_cache[model_name] = tf.keras.models.load_model(str(resolved_model_path))
+        _model_cache[model_name] = tf.keras.models.load_model(
+            str(resolved_model_path),
+            compile=False,
+        )
         print(f"Model loaded successfully from: {resolved_model_path}")
 
     return _model_cache[model_name]

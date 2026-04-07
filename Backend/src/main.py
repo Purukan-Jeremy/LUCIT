@@ -2,11 +2,17 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from src.config.supabase import supabase
 from src.controllers.prediction_controller import predict_image
+from src.models.model_loader import load_model
 from src.routes.chatbot_routes import chatbot_bp
 
 app = Flask(__name__)
 CORS(app)  
 app.register_blueprint(chatbot_bp)
+
+try:
+    load_model()
+except Exception as preload_error:
+    print(f"Model preload skipped: {preload_error}")
 
 @app.route("/", methods=["GET"])
 def root():

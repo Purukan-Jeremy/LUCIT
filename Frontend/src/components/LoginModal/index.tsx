@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "../../assets/style.css";
+import { storeAuthenticatedUser } from "../../utils/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
@@ -100,7 +101,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             fullname: result.user.fullname,
             email: result.user.email,
           };
-          localStorage.setItem("lucit_user", JSON.stringify(userData));
+          storeAuthenticatedUser(userData);
           onLoginSuccess(userData);
           onClose();
         } else {

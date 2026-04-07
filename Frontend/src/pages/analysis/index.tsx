@@ -1,10 +1,28 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
+import { hasActiveSession } from "../../utils/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
 const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
 type ChatMessage = { role: "user" | "assistant"; text: string };
+
+function formatPredictionLabel(prediction?: string) {
+  switch ((prediction || "").trim()) {
+    case "Colon N":
+      return "Colon Normal";
+    case "Colon ACA":
+      return "Colon Adenocarcinoma";
+    case "Lung ACA":
+      return "Lung Adenocarcinoma";
+    case "Lung N":
+      return "Lung Normal";
+    case "Lung SCC":
+      return "Lung Squamous Cell Carcinoma";
+    default:
+      return prediction || "Unknown";
+  }
+}
 
 const AnalysisPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -111,7 +129,7 @@ const AnalysisPage: React.FC = () => {
 
     const entry = {
       id: Date.now(),
-      prediction: data.prediction || "Unknown",
+      prediction: formatPredictionLabel(data.prediction),
       confidence: confidenceValue,
       createdAt: new Date().toISOString(),
       model: modelType === "classification" ? "Classification" : "Segmentation",
@@ -139,7 +157,7 @@ const AnalysisPage: React.FC = () => {
     const text = (predictionResult?.ai_description || "").trim();
     if (text) return text;
 
-    const prediction = predictionResult?.prediction || "Unknown";
+    const prediction = formatPredictionLabel(predictionResult?.prediction);
     const confidence = predictionResult?.confidence;
     const confidenceText =
       typeof confidence === "number" ? `${(confidence * 100).toFixed(2)}%` : "N/A";
@@ -214,8 +232,7 @@ const AnalysisPage: React.FC = () => {
   };
 
   const handleStartAnalysis = async () => {
-    const savedUser = localStorage.getItem("lucit_user");
-    if (!savedUser) {
+    if (!hasActiveSession()) {
       showNotice("info", "Please sign in first before starting detection.");
       window.dispatchEvent(new Event("lucit:open-login"));
       return;
@@ -264,6 +281,14 @@ const AnalysisPage: React.FC = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    document.body.classList.toggle("chat-lock", chatOpen);
+
+    return () => {
+      document.body.classList.remove("chat-lock");
+    };
+  }, [chatOpen]);
 
   const handleSendChat = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -481,7 +506,7 @@ const AnalysisPage: React.FC = () => {
                       <p>
                         <span className="metric-label">Prediction:</span>
                         <span className="metric-value" style={{ color: "#ffffff" }}>
-                          {predictionResult?.prediction || "N/A"}
+                          {formatPredictionLabel(predictionResult?.prediction) || "N/A"}
                         </span>
                       </p>
                       <p>
