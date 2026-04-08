@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from src.controllers.prediction_controller import predict_image  # harus sync
+from src.controllers.prediction_controller import ImageController
 
 prediction_bp = Blueprint("prediction", __name__)
 
@@ -16,7 +16,7 @@ def predict():
 
     model_type = request.form.get("model_type", "classification")  
     try:
-        result = predict_image(file, model_type=model_type)
+        result = ImageController.predict_image(file, model_type=model_type)
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500

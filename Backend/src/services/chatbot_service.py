@@ -80,40 +80,42 @@ def _is_analysis_related(message: str, analysis_context: dict, chat_history: lis
     return False
 
 
-def generate_chat_response(message: str, analysis_context: dict, chat_history: list | None = None) -> str:
-    if not _is_analysis_related(message, analysis_context, chat_history):
-        return OUT_OF_SCOPE_REPLY
+class LLMService:
+    @staticmethod
+    def generate_chat_response(message: str, analysis_context: dict, chat_history: list | None = None) -> str:
+        if not _is_analysis_related(message, analysis_context, chat_history):
+            return OUT_OF_SCOPE_REPLY
 
-    if not GEMINI_API_KEY:
-        return "Chatbot tidak tersedia karena GEMINI_API_KEY belum dikonfigurasi."
+        if not GEMINI_API_KEY:
+            return "Chatbot tidak tersedia karena GEMINI_API_KEY belum dikonfigurasi."
 
-    genai.configure(api_key=GEMINI_API_KEY)
+        genai.configure(api_key=GEMINI_API_KEY)
 
-    prediction = analysis_context.get("prediction", "Unknown")
-    confidence = analysis_context.get("confidence")
-    model_type = analysis_context.get("model_type", "classification")
-    ai_description = analysis_context.get("ai_description", "")
+        prediction = analysis_context.get("prediction", "Unknown")
+        confidence = analysis_context.get("confidence")
+        model_type = analysis_context.get("model_type", "classification")
+        ai_description = analysis_context.get("ai_description", "")
 
-    confidence_text = (
-        f"{float(confidence) * 100:.2f}%"
-        if isinstance(confidence, (int, float))
-        else "N/A"
-    )
+        confidence_text = (
+            f"{float(confidence) * 100:.2f}%"
+            if isinstance(confidence, (int, float))
+            else "N/A"
+        )
 
-    history_lines = []
-    for item in chat_history or []:
-        role = "User" if item.get("role") == "user" else "Assistant"
-        text = (item.get("text") or "").strip()
-        if text:
-            history_lines.append(f"{role}: {text}")
+        history_lines = []
+        for item in chat_history or []:
+            role = "User" if item.get("role") == "user" else "Assistant"
+            text = (item.get("text") or "").strip()
+            if text:
+                history_lines.append(f"{role}: {text}")
 
-    history_text = (
-        "\n".join(history_lines)
-        if history_lines
-        else "Belum ada percakapan sebelumnya."
-    )
+        history_text = (
+            "\n".join(history_lines)
+            if history_lines
+            else "Belum ada percakapan sebelumnya."
+        )
 
-    prompt = f"""Anda adalah asisten AI untuk aplikasi analisis histopatologi.
+        prompt = f"""Anda adalah asisten AI untuk aplikasi analisis histopatologi.
 
 Tugas Anda:
 - Menjawab pertanyaan user berdasarkan hasil analisis yang tersedia.
@@ -137,17 +139,21 @@ Pertanyaan user:
 
 Jawab dalam 1-3 paragraf singkat, relevan dengan hasil analisis di atas."""
 
-    last_error = None
-    for model_name in _chat_candidate_models():
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            text = (response.text or "").strip().replace("**", "").replace("*", "")
-            if text:
-                return text
-        except Exception as e:
-            last_error = e
-            print(f"Chat model '{model_name}' failed: {e}")
+        last_error = None
+        for model_name in _chat_candidate_models():
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                text = (response.text or "").strip().replace("**", "").replace("*", "")
+                if text:
+                    return text
+            except Exception as e:
+                last_error = e
+                print(f"Chat model '{model_name}' failed: {e}")
 
-    print(f"All chat model candidates failed: {last_error}")
-    return "Chatbot sedang tidak tersedia untuk sementara. Silakan coba lagi dalam beberapa saat."
+        print(f"All chat model candidates failed: {last_error}")
+        return "Chatbot sedang tidak tersedia untuk sementara. Silakan coba lagi dalam beberapa saat."
+
+
+def generate_chat_response(message: str, analysis_context: dict, chat_history: list | None = None) -> str:
+    return LLMService.generate_chat_response(message, analysis_context, chat_history)
