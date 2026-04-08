@@ -221,4 +221,8 @@ def run_segmentation(image_bytes: bytes, seg_model) -> dict:
         "area_stats"    : area_stats,
         "mask_shape"    : list(mask.shape),
         "threshold"     : THRESHOLD,
+<<<<<<< HEAD
     }
+=======
+    }
+>>>>>>> 5cd513b7aaed11bcf82c0f962059743e0015108f

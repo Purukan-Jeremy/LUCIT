@@ -26,4 +26,8 @@ class ConsultLLMController:
 
 
 def send_chat_message(data: dict):
+<<<<<<< HEAD
     return ConsultLLMController.send_chat_message(data)
+=======
+    return ConsultLLMController.send_chat_message(data)
+>>>>>>> 5cd513b7aaed11bcf82c0f962059743e0015108f

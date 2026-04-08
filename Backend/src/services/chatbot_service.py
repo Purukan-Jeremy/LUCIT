@@ -156,4 +156,8 @@ Jawab dalam 1-3 paragraf singkat, relevan dengan hasil analisis di atas."""
 
 
 def generate_chat_response(message: str, analysis_context: dict, chat_history: list | None = None) -> str:
+<<<<<<< HEAD
     return LLMService.generate_chat_response(message, analysis_context, chat_history)
+=======
+    return LLMService.generate_chat_response(message, analysis_context, chat_history)
+>>>>>>> 5cd513b7aaed11bcf82c0f962059743e0015108f
