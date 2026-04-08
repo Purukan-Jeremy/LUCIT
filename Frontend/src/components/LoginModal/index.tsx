@@ -64,13 +64,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           }),
         });
 
+        console.log("Registration response status:", response.status);
         const result = await parseApiBody(response);
+        console.log("Registration response body:", result);
+
         if (response.ok) {
           setMessage({ type: "success", text: "Account created successfully! You can now login." });
           setIsSignUp(false);
           setFormData({ fullName: "", email: "", password: "" });
         } else {
-          throw new Error(result.error || "Failed to sign up");
+          // If response is not ok (e.g., 409 Conflict), throw the specific error message from the backend
+          const errorMsg = result.error || "Failed to sign up";
+          throw new Error(errorMsg);
         }
       } catch (err) {
         const text =

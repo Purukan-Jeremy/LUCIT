@@ -18,7 +18,12 @@ def add_user():
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
-        result = create_user(data)  
-        return jsonify(result)
+        result = create_user(data)
+        
+        if result.get("status") == "error":
+            # Return the exact message from create_user
+            return jsonify({"error": result.get("message")}), 409
+            
+        return jsonify(result.get("data")), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500

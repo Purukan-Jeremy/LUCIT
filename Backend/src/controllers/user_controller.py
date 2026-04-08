@@ -9,12 +9,27 @@ def create_user(user_data):
     Menyimpan user baru ke tabel tbl_users di Supabase.
     user_data: dict berisi name, email, dan password.
     """
+    email = user_data.get("email", "").lower().strip()
+    fullname = user_data.get("fullname")
+    password = user_data.get("password")
+
+    if not email or not password:
+        return {"status": "error", "message": "Email and password are required."}
+    
+    # Check if email already exists
+    # We use .eq() with the lowercased email for maximum reliability
+    existing_user = supabase.table("tbl_users").select("email").eq("email", email).execute()
+    
+    if existing_user.data and len(existing_user.data) > 0:
+        return {"status": "error", "message": "Email is already been registered!"}
+
     response = supabase.table("tbl_users").insert({
-        "fullname": user_data.get("fullname"),
-        "email": user_data.get("email"),
-        "password": user_data.get("password") # Catatan: Dalam produksi, password harus di-hash.
+        "fullname": fullname,
+        "email": email,
+        "password": password # Catatan: Dalam produksi, password harus di-hash.
     }).execute()
-    return response.data
+    
+    return {"status": "success", "data": response.data}
 
 def login_user(credentials):
     """

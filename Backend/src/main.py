@@ -1,14 +1,20 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from src.config.supabase import supabase
-from src.controllers.prediction_controller import predict_image
 from src.models.model_loader import load_model
 from src.routes.chatbot_routes import chatbot_bp
+from src.routes.user_routes import user_bp
+from src.routes.prediction_routes import prediction_bp
 
 app = Flask(__name__)
-CORS(app)  
-app.register_blueprint(chatbot_bp)
+CORS(app)
 
+# Register Blueprints
+app.register_blueprint(chatbot_bp)
+app.register_blueprint(user_bp)
+app.register_blueprint(prediction_bp, url_prefix="/api")
+
+# Preload model on startup
 try:
     load_model()
 except Exception as preload_error:
@@ -20,37 +26,15 @@ def root():
 
 @app.route("/testing", methods=["GET"])
 def test_supabase():
-    res = supabase.table("users").select("*").limit(1).execute()
-    return jsonify({
-        "success": True,
-        "data": res.data
-    })
-
-@app.route("/api/users", methods=["GET"])
-def get_users():
     try:
-        from src.controllers.user_controller import get_users as get_users_controller
-        users = get_users_controller()
-        return jsonify(users)
+        # Check if tbl_users exists instead of 'users' to match your schema
+        res = supabase.table("tbl_users").select("*").limit(1).execute()
+        return jsonify({
+            "success": True,
+            "data": res.data
+        })
     except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
-
-@app.route("/api/users", methods=["POST"])
-def create_user():
-    try:
-        data = request.get_json(silent=True) or {}
-        fullname = data.get("fullname")
-        email = data.get("email")
-        password = data.get("password")
-
-        if not fullname or not email or not password:
-            return jsonify({"status": "error", "error": "fullname, email, and password are required"}), 400
-
-        from src.controllers.user_controller import create_user as create_user_controller
-        result = create_user_controller(data)
-        return jsonify({"status": "success", "data": result}), 201
-    except Exception as e:
-        return jsonify({"status": "error", "error": str(e)}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/login", methods=["POST"])
 def login():
@@ -68,25 +52,6 @@ def login():
         return jsonify(result), 401
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route("/api/predict", methods=["POST"])
-def predict():
-    """
-    Endpoint untuk prediksi gambar histopatologi dari front-end
-    - menerima file image
-    - menerima model_type: classification / segmentation
-    """
-    file = request.files.get("file")
-    if not file:
-        return jsonify({"error": "No file uploaded"}), 400
-
-    model_type = request.form.get("model_type", "classification")  
-
-    try:
-        result = predict_image(file, model_type=model_type)
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)
