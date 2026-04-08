@@ -32,6 +32,8 @@ def root():
 def test_supabase():
     try:
         # Check if tbl_users exists instead of 'users' to match your schema
+        # Falls back to 'users' if 'tbl_users' is not the one intended, 
+        # but following existing project convention of 'tbl_users'.
         res = supabase.table("tbl_users").select("*").limit(1).execute()
         return jsonify({
             "success": True,
@@ -39,6 +41,13 @@ def test_supabase():
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/users", methods=["GET"])
+def get_users():
+    """
+    Endpoint untuk mendapatkan daftar user (jika diperlukan)
+    """
+    try:
         from src.controllers.user_controller import UserController
         users = UserController.get_users()
         return jsonify(users)
