@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "../../assets/style.css";
+import { storeAuthenticatedUser } from "../../utils/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
@@ -63,13 +64,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           }),
         });
 
+        console.log("Registration response status:", response.status);
         const result = await parseApiBody(response);
+        console.log("Registration response body:", result);
+
         if (response.ok) {
           setMessage({ type: "success", text: "Account created successfully! You can now login." });
           setIsSignUp(false);
           setFormData({ fullName: "", email: "", password: "" });
         } else {
-          throw new Error(result.error || "Failed to sign up");
+          // If response is not ok (e.g., 409 Conflict), throw the specific error message from the backend
+          const errorMsg = result.error || "Failed to sign up";
+          throw new Error(errorMsg);
         }
       } catch (err) {
         const text =
@@ -100,7 +106,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             fullname: result.user.fullname,
             email: result.user.email,
           };
-          localStorage.setItem("lucit_user", JSON.stringify(userData));
+          storeAuthenticatedUser(userData);
           onLoginSuccess(userData);
           onClose();
         } else {

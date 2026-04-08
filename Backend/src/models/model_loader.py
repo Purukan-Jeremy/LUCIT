@@ -70,9 +70,10 @@ def load_model(model_name="mobilenetv2.keras"):
     """
     global _model_cache
 
-    tf.keras.backend.clear_session()
-
     if model_name not in _model_cache:
+        # Clear session to avoid OOM or graph conflicts when loading new models
+        tf.keras.backend.clear_session()
+        
         project_root = Path(__file__).resolve().parents[2]
         models_dir = project_root / "src" / "models"
 
@@ -124,7 +125,10 @@ def load_model(model_name="mobilenetv2.keras"):
                 compile=False,   # skip re-compile, kita tidak butuh training
             )
         else:
-            loaded = tf.keras.models.load_model(str(resolved_model_path))
+            loaded = tf.keras.models.load_model(
+                str(resolved_model_path),
+                compile=False
+            )
 
         _model_cache[model_name] = loaded
         print(f"[ModelLoader] '{model_name}' loaded from: {resolved_model_path}")

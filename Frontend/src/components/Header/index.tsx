@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import "../../assets/style.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LoginModal from "../LoginModal";
+import { logoutUser, readStoredUser } from "../../utils/session";
 
 type DocumentWithViewTransition = Document & {
   startViewTransition?: (updateCallback: () => void) => void;
@@ -10,10 +12,9 @@ function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-  const [user, setUser] = useState<{ fullname: string; email: string } | null>(() => {
-    const saved = localStorage.getItem("lucit_user");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [user, setUser] = useState<{ fullname: string; email: string } | null>(() =>
+    readStoredUser(),
+  );
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
   
@@ -45,7 +46,7 @@ function Header() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("lucit_user");
+    logoutUser("manual");
     setUser(null);
     setIsLogoutModalOpen(false);
     setShowProfileDropdown(false);
@@ -69,6 +70,35 @@ function Header() {
     window.addEventListener("lucit:open-login", handleOpenLogin);
     return () => window.removeEventListener("lucit:open-login", handleOpenLogin);
   }, []);
+
+  useEffect(() => {
+    const syncUser = () => {
+      setUser(readStoredUser());
+    };
+
+    const handleAuthChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{ user: { fullname: string; email: string } | null }>;
+      setUser(customEvent.detail?.user ?? readStoredUser());
+    };
+
+    const handleSessionExpired = () => {
+      setUser(null);
+      setIsLogoutModalOpen(false);
+      setShowProfileDropdown(false);
+      setIsLoginModalOpen(false);
+      navigate("/");
+    };
+
+    window.addEventListener("storage", syncUser);
+    window.addEventListener("lucit:auth-changed", handleAuthChanged as EventListener);
+    window.addEventListener("lucit:session-expired", handleSessionExpired);
+
+    return () => {
+      window.removeEventListener("storage", syncUser);
+      window.removeEventListener("lucit:auth-changed", handleAuthChanged as EventListener);
+      window.removeEventListener("lucit:session-expired", handleSessionExpired);
+    };
+  }, [navigate]);
 
   useEffect(() => {
     if (!isLogoutModalOpen) return;

@@ -1,10 +1,28 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
+import { hasActiveSession } from "../../utils/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
 const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
 type ChatMessage = { role: "user" | "assistant"; text: string };
+
+function formatPredictionLabel(prediction?: string) {
+  switch ((prediction || "").trim()) {
+    case "Colon N":
+      return "Colon Normal";
+    case "Colon ACA":
+      return "Colon Adenocarcinoma";
+    case "Lung ACA":
+      return "Lung Adenocarcinoma";
+    case "Lung N":
+      return "Lung Normal";
+    case "Lung SCC":
+      return "Lung Squamous Cell Carcinoma";
+    default:
+      return prediction || "Unknown";
+  }
+}
 
 const AnalysisPage: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -33,13 +51,15 @@ const AnalysisPage: React.FC = () => {
     // segmentation fields
     mask_image?: string;
     overlay_image?: string;
+    segmentation_mask?: string; // Keep for compatibility
     area_stats?: {
-      cancer_percent: number;
-      normal_percent: number;
-      cancer_pixels: number;
-      total_pixels: number;
+      cancer_percent?: number;
+      normal_percent?: number;
+      cancer_pixels?: number;
+      total_pixels?: number;
+      tumor_area?: number; // From backend service
+      total_area?: number; // From backend service
     };
-    threshold?: number;
     // error
     error?: string;
     message?: string;
@@ -47,10 +67,7 @@ const AnalysisPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [notice, setNotice] = useState<{
-    type: "info" | "error";
-    text: string;
-  } | null>(null);
+  const [notice, setNotice] = useState<{ type: "info" | "error"; text: string } | null>(null);
   const [modelSelectAttention, setModelSelectAttention] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -95,9 +112,7 @@ const AnalysisPage: React.FC = () => {
     );
   };
 
-  const inferVariant = (
-    prediction?: string,
-  ): "lung" | "colon" | "breast" | "unknown" => {
+  const inferVariant = (prediction?: string): "lung" | "colon" | "breast" | "unknown" => {
     const text = (prediction || "").toLowerCase();
     if (text.includes("lung")) return "lung";
     if (text.includes("colon")) return "colon";
@@ -110,8 +125,13 @@ const AnalysisPage: React.FC = () => {
 
     const isSegmentation = data.model_type === "segmentation";
 
+    const cancerPercent = data.area_stats?.cancer_percent ?? 
+                         (data.area_stats?.tumor_area && data.area_stats?.total_area 
+                          ? ((data.area_stats.tumor_area / data.area_stats.total_area) * 100).toFixed(2) 
+                          : "N/A");
+
     const confidenceValue = isSegmentation
-      ? `Cancer area: ${data.area_stats?.cancer_percent ?? "N/A"}%`
+      ? `Tumor area: ${cancerPercent}%`
       : typeof data.confidence === "number"
         ? `${(data.confidence * 100).toFixed(2)}%`
         : "N/A";
@@ -119,8 +139,10 @@ const AnalysisPage: React.FC = () => {
     const heatmapImage = data.gradcam_heatmap
       ? `data:image/jpeg;base64,${data.gradcam_heatmap}`
       : data.mask_image
-        ? `data:image/jpeg;base64,${data.mask_image}`
-        : "";
+        ? `data:image/png;base64,${data.mask_image}`
+        : data.segmentation_mask
+          ? `data:image/png;base64,${data.segmentation_mask}`
+          : "";
 
     const overlayImage = data.gradcam_image
       ? `data:image/jpeg;base64,${data.gradcam_image}`
@@ -129,8 +151,8 @@ const AnalysisPage: React.FC = () => {
         : "";
 
     const predictionLabel = isSegmentation
-      ? `Cancer: ${data.area_stats?.cancer_percent ?? "N/A"}% | Normal: ${data.area_stats?.normal_percent ?? "N/A"}%`
-      : data.prediction || "Unknown";
+      ? `Segmentation: ${cancerPercent}% Tumor`
+      : formatPredictionLabel(data.prediction);
 
     const entry = {
       id: Date.now(),
@@ -159,22 +181,27 @@ const AnalysisPage: React.FC = () => {
   };
 
   const getDescriptionText = () => {
-    // Segmentation: buat deskripsi dari area_stats
     if (predictionResult?.model_type === "segmentation") {
       const stats = predictionResult.area_stats;
+      const text = (predictionResult?.ai_description || "").trim();
+      if (text) return text;
+
       if (stats) {
+        const tumorArea = stats.tumor_area ?? stats.cancer_pixels ?? 0;
+        const totalArea = stats.total_area ?? stats.total_pixels ?? 1;
+        const cancerPercent = stats.cancer_percent ?? ((tumorArea / totalArea) * 100);
+        
         const level =
-          stats.cancer_percent > 50
+          cancerPercent > 50
             ? "more than half"
-            : stats.cancer_percent > 25
+            : cancerPercent > 25
               ? "a significant portion"
               : "a minor portion";
+              
         return (
-          `The segmentation model identified cancerous regions covering approximately ${stats.cancer_percent}% ` +
-          `of the tissue area (${stats.cancer_pixels.toLocaleString()} out of ${stats.total_pixels.toLocaleString()} pixels). ` +
-          `This means ${level} of the analyzed tissue shows characteristics associated with malignancy. ` +
-          `The remaining ${stats.normal_percent}% of tissue appears normal based on the model output. ` +
-          `The red overlay in the segmentation image highlights the areas flagged as cancerous. ` +
+          `The segmentation model identified regions of interest covering approximately ${cancerPercent.toFixed(2)}% ` +
+          `of the tissue area. This means ${level} of the analyzed tissue shows morphological characteristics flagged by the model. ` +
+          `The segmentation mask and red overlay highlight these specific areas for further review. ` +
           `This result is intended as decision-support only and should be reviewed by a qualified pathologist ` +
           `alongside clinical findings before any diagnostic conclusion is made.`
         );
@@ -182,16 +209,13 @@ const AnalysisPage: React.FC = () => {
       return "Segmentation analysis complete. Please review the mask and overlay images above.";
     }
 
-    // Classification: gunakan ai_description dari backend atau fallback
     const text = (predictionResult?.ai_description || "").trim();
     if (text) return text;
 
-    const prediction = predictionResult?.prediction || "Unknown";
+    const prediction = formatPredictionLabel(predictionResult?.prediction);
     const confidence = predictionResult?.confidence;
     const confidenceText =
-      typeof confidence === "number"
-        ? `${(confidence * 100).toFixed(2)}%`
-        : "N/A";
+      typeof confidence === "number" ? `${(confidence * 100).toFixed(2)}%` : "N/A";
     const predictionLower = prediction.toLowerCase();
     const riskPhrase =
       predictionLower.includes("aca") ||
@@ -236,15 +260,18 @@ const AnalysisPage: React.FC = () => {
       setPredictionResult(data);
 
       if (data.model_type === "segmentation") {
-        // Segmentasi: pakai mask_image dan overlay_image
         if (data.mask_image) {
-          setHeatmapPreview(`data:image/jpeg;base64,${data.mask_image}`);
+          setHeatmapPreview(`data:image/png;base64,${data.mask_image}`);
+        } else if (data.segmentation_mask) {
+          setHeatmapPreview(`data:image/png;base64,${data.segmentation_mask}`);
         }
+        
         if (data.overlay_image) {
           setOverlayPreview(`data:image/jpeg;base64,${data.overlay_image}`);
+        } else if (data.gradcam_image) {
+          setOverlayPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
         }
       } else {
-        // Klasifikasi: pakai gradcam_heatmap dan gradcam_image
         if (data.gradcam_heatmap) {
           setHeatmapPreview(`data:image/jpeg;base64,${data.gradcam_heatmap}`);
         }
@@ -271,8 +298,7 @@ const AnalysisPage: React.FC = () => {
   };
 
   const handleStartAnalysis = async () => {
-    const savedUser = localStorage.getItem("lucit_user");
-    if (!savedUser) {
+    if (!hasActiveSession()) {
       showNotice("info", "Please sign in first before starting detection.");
       window.dispatchEvent(new Event("lucit:open-login"));
       return;
@@ -322,6 +348,14 @@ const AnalysisPage: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    document.body.classList.toggle("chat-lock", chatOpen);
+
+    return () => {
+      document.body.classList.remove("chat-lock");
+    };
+  }, [chatOpen]);
+
   const handleSendChat = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isChatLoading) return;
@@ -329,10 +363,7 @@ const AnalysisPage: React.FC = () => {
     const message = chatInput.trim();
     if (!message) return;
 
-    const historyForRequest = [
-      ...chatMessages,
-      { role: "user", text: message },
-    ];
+    const historyForRequest = [...chatMessages, { role: "user", text: message }];
     setChatMessages(historyForRequest);
     setChatInput("");
     setIsChatLoading(true);
@@ -349,7 +380,6 @@ const AnalysisPage: React.FC = () => {
             confidence: predictionResult?.confidence,
             ai_description: predictionResult?.ai_description,
             warning: predictionResult?.warning,
-            // Tambahan context segmentasi untuk chatbot
             area_stats: predictionResult?.area_stats,
           },
           chat_history: chatMessages,
@@ -361,47 +391,30 @@ const AnalysisPage: React.FC = () => {
       try {
         result = rawText ? JSON.parse(rawText) : {};
       } catch {
-        result = {
-          status: "error",
-          message: rawText || "Invalid server response",
-        };
+        result = { status: "error", message: rawText || "Invalid server response" };
       }
 
       const assistantText =
         response.ok && result.status === "success"
-          ? result.reply ||
-            "Maaf, saya tidak dapat menghasilkan jawaban saat ini."
+          ? result.reply || "Maaf, saya tidak dapat menghasilkan jawaban saat ini."
           : result.message || "Chatbot sedang tidak tersedia untuk sementara.";
 
-      setChatMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: assistantText },
-      ]);
+      setChatMessages((prev) => [...prev, { role: "assistant", text: assistantText }]);
     } catch {
       setChatMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          text: "Chatbot sedang tidak tersedia untuk sementara.",
-        },
+        { role: "assistant", text: "Chatbot sedang tidak tersedia untuk sementara." },
       ]);
     } finally {
       setIsChatLoading(false);
     }
   };
 
-  // ── Label dinamis untuk panel visual ──────────────────────────
   const isSegmentation = predictionResult?.model_type === "segmentation";
   const heatmapLabel = isSegmentation ? "Binary Mask" : "Grad-CAM Heatmap";
-  const overlayLabel = isSegmentation
-    ? "Overlay (Red=Cancer)"
-    : "Grad-CAM Overlay";
-  const heatmapEmpty = isSegmentation
-    ? "Mask not available"
-    : "Heatmap not available";
-  const overlayEmpty = isSegmentation
-    ? "Overlay not available"
-    : "Overlay not available";
+  const overlayLabel = isSegmentation ? "Overlay (Red=ROI)" : "Grad-CAM Overlay";
+  const heatmapEmpty = isSegmentation ? "Mask not available" : "Heatmap not available";
+  const overlayEmpty = isSegmentation ? "Overlay not available" : "Overlay not available";
 
   return (
     <div className={`analysis-container ${chatOpen ? "chat-open" : ""}`}>
@@ -409,19 +422,15 @@ const AnalysisPage: React.FC = () => {
         <div className="analysis-hero">
           <h1>AI Histopathology Analysis</h1>
           <p className="analysis-hero-subtitle">
-            Select a model, upload a histopathology image, and review clear
-            AI‑assisted insights for classification or segmentation.
+            Select a model, upload a histopathology image, and review clear AI‑assisted
+            insights for classification or segmentation.
           </p>
         </div>
 
         {notice && (
           <div className={`notice notice-top ${notice.type}`}>
             <span>{notice.text}</span>
-            <button
-              type="button"
-              onClick={() => setNotice(null)}
-              aria-label="Close notification"
-            >
+            <button type="button" onClick={() => setNotice(null)} aria-label="Close notification">
               ×
             </button>
           </div>
@@ -429,133 +438,131 @@ const AnalysisPage: React.FC = () => {
 
         <div className="analysis-card">
           <div className="card-left">
-            <h2 className="upload-title">
-              {modelType === "classification"
-                ? "Upload image histopathology for classification"
-                : modelType === "segmentation"
-                  ? "Upload image histopathology for segmentation"
-                  : "Upload image histopathology"}
-            </h2>
+          <h2 className="upload-title">
+            {modelType === "classification"
+              ? "Upload image histopathology for classification"
+              : modelType === "segmentation"
+                ? "Upload image histopathology for segmentation"
+                : "Upload image histopathology"}
+          </h2>
 
-            <div className="upload-box">
-              <input
-                type="file"
-                id="file-upload"
-                accept="image/*"
-                onChange={handleImageChange}
-                ref={fileInputRef}
-                disabled={modelType === "none"}
-                hidden
-              />
-              <label
-                htmlFor="file-upload"
-                className={`upload-label ${modelType === "none" ? "disabled" : ""}`}
-                onClick={(event) => {
-                  if (modelType === "none") {
-                    event.preventDefault();
-                    showNotice("info", "Please select a model first.");
-                    triggerModelSelectAttention();
-                  }
-                }}
-              >
-                <div className="folder-icon">
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                  </svg>
-                </div>
-              </label>
-
-              <div
-                className={`model-select ${modelSelectAttention ? "attention" : ""}`}
-              >
-                <select
-                  id="model-type"
-                  className="model-dropdown"
-                  value={modelType}
-                  onChange={(event) =>
-                    setModelType(
-                      event.target.value as
-                        | "none"
-                        | "classification"
-                        | "segmentation",
-                    )
-                  }
-                  disabled={isAnalyzed}
-                >
-                  <option value="none">Select Model</option>
-                  <option value="classification">Classification</option>
-                  <option value="segmentation">Segmentation</option>
-                </select>
-              </div>
-            </div>
-
-            {selectedPreview && !isAnalyzed && (
-              <div style={{ marginTop: "1rem" }}>
-                <img
-                  src={selectedPreview}
-                  alt="Selected preview"
-                  className="selected-preview-image"
-                />
-              </div>
-            )}
-
-            <button
-              className="primary-btn start-analysis-btn"
-              onClick={handleStartAnalysis}
-              disabled={!selectedImage || modelType === "none" || isLoading}
-              style={{
-                opacity:
-                  !selectedImage || modelType === "none" || isLoading ? 0.6 : 1,
-                cursor:
-                  !selectedImage || modelType === "none" || isLoading
-                    ? "not-allowed"
-                    : "pointer",
+          <div className="upload-box">
+            <input
+              type="file"
+              id="file-upload"
+              accept="image/*"
+              onChange={handleImageChange}
+              ref={fileInputRef}
+              disabled={modelType === "none"}
+              hidden
+            />
+            <label
+              htmlFor="file-upload"
+              className={`upload-label ${modelType === "none" ? "disabled" : ""}`}
+              onClick={(event) => {
+                if (modelType === "none") {
+                  event.preventDefault();
+                  showNotice("info", "Please select a model first.");
+                  triggerModelSelectAttention();
+                }
               }}
             >
-              {isLoading ? "Analyzing..." : "Start Analysis"}
-            </button>
-
-            {isAnalyzed && (
-              <button
-                className="primary-btn"
-                onClick={handleReset}
-                style={{
-                  marginTop: "1rem",
-                  backgroundColor: "#6c757d",
-                }}
-              >
-                Analyze Another Image
-              </button>
-            )}
-
-            {selectedImage && !isAnalyzed && (
-              <p
-                style={{ marginTop: "1rem", color: "#666", fontSize: "0.9rem" }}
-              >
-                File selected: <strong>{selectedImage.name}</strong>
-              </p>
-            )}
-
-            {error && (
-              <div
-                className="analysis-error-panel"
-                style={{
-                  marginTop: "1rem",
-                }}
-              >
-                <strong>Error:</strong> {error}
+              <div className="folder-icon">
+                <svg
+                  width="80"
+                  height="80"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
               </div>
-            )}
+            </label>
+
+            <div
+              className={`model-select ${modelSelectAttention ? "attention" : ""}`}
+            >
+              <select
+                id="model-type"
+                className="model-dropdown"
+                value={modelType}
+                onChange={(event) =>
+                  setModelType(
+                    event.target.value as
+                      | "none"
+                      | "classification"
+                      | "segmentation",
+                  )
+                }
+                disabled={isAnalyzed}
+              >
+                <option value="none">Select Model</option>
+                <option value="classification">Classification</option>
+                <option value="segmentation">Segmentation</option>
+              </select>
+            </div>
           </div>
+
+          {selectedPreview && !isAnalyzed && (
+            <div style={{ marginTop: "1rem" }}>
+              <img
+                src={selectedPreview}
+                alt="Selected preview"
+                className="selected-preview-image"
+              />
+            </div>
+          )}
+
+          <button
+            className="primary-btn start-analysis-btn"
+            onClick={handleStartAnalysis}
+            disabled={!selectedImage || modelType === "none" || isLoading}
+            style={{
+              opacity:
+                !selectedImage || modelType === "none" || isLoading ? 0.6 : 1,
+              cursor:
+                !selectedImage || modelType === "none" || isLoading
+                  ? "not-allowed"
+                  : "pointer",
+            }}
+          >
+            {isLoading ? "Analyzing..." : "Start Analysis"}
+          </button>
+
+          {isAnalyzed && (
+            <button
+              className="primary-btn"
+              onClick={handleReset}
+              style={{
+                marginTop: "1rem",
+                backgroundColor: "#6c757d",
+              }}
+            >
+              Analyze Another Image
+            </button>
+          )}
+
+          {selectedImage && !isAnalyzed && (
+            <p style={{ marginTop: "1rem", color: "#666", fontSize: "0.9rem" }}>
+              File selected: <strong>{selectedImage.name}</strong>
+            </p>
+          )}
+
+          {error && (
+            <div
+              className="analysis-error-panel"
+              style={{
+                marginTop: "1rem",
+              }}
+            >
+              <strong>Error:</strong> {error}
+            </div>
+          )}
+        </div>
 
           <div className="card-right">
             {isLoading ? (
@@ -570,41 +577,32 @@ const AnalysisPage: React.FC = () => {
                     <h3 style={{ marginBottom: "0.5rem" }}>Analysis Results</h3>
                     <div className="metrics-center">
                       {isSegmentation ? (
-                        // ── Segmentasi: tampilkan area stats ──
                         <>
                           <p>
-                            <span className="metric-label">Cancer Area:</span>
-                            <span
-                              className="metric-value"
-                              style={{ color: "#ff6b6b" }}
-                            >
-                              {predictionResult.area_stats?.cancer_percent ??
-                                "N/A"}
-                              %
+                            <span className="metric-label">Tumor Area:</span>
+                            <span className="metric-value" style={{ color: "#ff6b6b" }}>
+                              {predictionResult.area_stats?.cancer_percent?.toFixed(2) ?? 
+                               (predictionResult.area_stats?.tumor_area && predictionResult.area_stats?.total_area 
+                                ? ((predictionResult.area_stats.tumor_area / predictionResult.area_stats.total_area) * 100).toFixed(2) 
+                                : "N/A")}%
                             </span>
                           </p>
                           <p>
                             <span className="metric-label">Normal Area:</span>
-                            <span
-                              className="metric-value"
-                              style={{ color: "#ffffff" }}
-                            >
-                              {predictionResult.area_stats?.normal_percent ??
-                                "N/A"}
-                              %
+                            <span className="metric-value" style={{ color: "#ffffff" }}>
+                              {predictionResult.area_stats?.normal_percent?.toFixed(2) ?? 
+                               (predictionResult.area_stats?.tumor_area && predictionResult.area_stats?.total_area 
+                                ? (100 - (predictionResult.area_stats.tumor_area / predictionResult.area_stats.total_area) * 100).toFixed(2) 
+                                : "N/A")}%
                             </span>
                           </p>
                         </>
                       ) : (
-                        // ── Klasifikasi: tampilkan prediction & confidence ──
                         <>
                           <p>
                             <span className="metric-label">Prediction:</span>
-                            <span
-                              className="metric-value"
-                              style={{ color: "#ffffff" }}
-                            >
-                              {predictionResult?.prediction || "N/A"}
+                            <span className="metric-value" style={{ color: "#ffffff" }}>
+                              {formatPredictionLabel(predictionResult?.prediction) || "N/A"}
                             </span>
                           </p>
                           <p>
@@ -679,18 +677,18 @@ const AnalysisPage: React.FC = () => {
                   <div className="step-item">
                     <h3>2. AI Analysis</h3>
                     <p>
-                      AI performs classification to identify tissue categories
-                      and uses Grad-CAM visualization to highlight regions of
-                      interest that influenced the prediction.
+                      AI performs classification to identify tissue categories and
+                      uses Grad-CAM visualization to highlight regions of interest
+                      that influenced the prediction.
                     </p>
                   </div>
 
                   <div className="step-item">
                     <h3>3. Result</h3>
                     <p>
-                      Prediction results, Grad-CAM visualization, and
-                      AI-generated medical description are displayed to support
-                      early detection, not as a medical diagnosis.
+                      Prediction results, Grad-CAM visualization, and AI-generated
+                      medical description are displayed to support early
+                      detection, not as a medical diagnosis.
                     </p>
                   </div>
                 </div>
@@ -726,9 +724,7 @@ const AnalysisPage: React.FC = () => {
           <div className="analysis-description-card">
             <h3>
               AI Analysis Description for{" "}
-              {modelType === "classification"
-                ? "Classification"
-                : "Segmentation"}
+              {modelType === "classification" ? "Classification" : "Segmentation"}
               :
             </h3>
 
@@ -745,7 +741,9 @@ const AnalysisPage: React.FC = () => {
         )}
       </div>
 
-      <div className={`chatbot-sidebar ${chatOpen ? "open" : ""}`}>
+      <div
+        className={`chatbot-sidebar ${chatOpen ? "open" : ""}`}
+      >
         <div className="chatbot-header">
           <div>AI Consultation Chat</div>
           <button
@@ -762,9 +760,7 @@ const AnalysisPage: React.FC = () => {
           {chatMessages.length === 0 ? (
             <div className="chatbot-empty">
               Discuss the analysis results for{" "}
-              {modelType === "classification"
-                ? "classification"
-                : "segmentation"}{" "}
+              {modelType === "classification" ? "classification" : "segmentation"}{" "}
               with the AI assistant.
             </div>
           ) : (
@@ -778,14 +774,8 @@ const AnalysisPage: React.FC = () => {
                 </div>
               ))}
               {isChatLoading ? (
-                <div
-                  className="chatbot-message assistant loading"
-                  aria-live="polite"
-                >
-                  <div
-                    className="chatbot-typing"
-                    aria-label="Assistant is typing"
-                  >
+                <div className="chatbot-message assistant loading" aria-live="polite">
+                  <div className="chatbot-typing" aria-label="Assistant is typing">
                     <span />
                     <span />
                     <span />
@@ -799,11 +789,7 @@ const AnalysisPage: React.FC = () => {
         <form className="chatbot-input" onSubmit={handleSendChat}>
           <input
             type="text"
-            placeholder={
-              isChatLoading
-                ? "Waiting for assistant response..."
-                : "Type your question..."
-            }
+            placeholder={isChatLoading ? "Waiting for assistant response..." : "Type your question..."}
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
             disabled={isChatLoading}

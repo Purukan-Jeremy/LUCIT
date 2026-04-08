@@ -24,8 +24,8 @@ from io import BytesIO
 # Konfigurasi
 # ──────────────────────────────────────────────
 
-THRESHOLD     = 0.35         # Sigmoid threshold: >= 0.5 → kanker
-OVERLAY_ALPHA = 0.45        # Transparansi overlay
+THRESHOLD     = 0.35         # Sigmoid threshold: >= THRESHOLD → kanker
+OVERLAY_ALPHA = 0.4         # Transparansi overlay (0.3 - 0.5 ideal untuk melihat tekstur)
 COLOR_CANCER  = (0, 0, 255) # Merah (BGR) → area kanker
 SHOW_NORMAL_OVERLAY = False  # True = overlay hijau di area normal
 
@@ -98,6 +98,8 @@ def postprocess_mask(main_output: np.ndarray, threshold: float = THRESHOLD) -> n
 def create_mask_overlay(original_image: np.ndarray, mask: np.ndarray, alpha: float = OVERLAY_ALPHA) -> np.ndarray:
     """
     Overlay merah di area kanker pada gambar asli.
+    Area normal tetap seperti gambar asli tanpa penggelapan.
+    
     original_image : (H, W, 3) RGB
     mask           : (H, W) uint8
     Returns        : (H, W, 3) BGR
@@ -106,14 +108,34 @@ def create_mask_overlay(original_image: np.ndarray, mask: np.ndarray, alpha: flo
     if mask.shape[:2] != (h, w):
         mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
 
+    # Konversi ke BGR (OpenCV standard)
     original_bgr = cv2.cvtColor(original_image, cv2.COLOR_RGB2BGR)
+    
+    # Buat copy untuk hasil final
+    res = original_bgr.copy()
+    
+    # Buat mask warna merah
     color_mask = np.zeros_like(original_bgr, dtype=np.uint8)
     color_mask[mask == 1] = COLOR_CANCER
+    
+    # Hanya lakukan blending pada area ROI (mask == 1)
+    mask_indices = (mask == 1)
+    
+    if np.any(mask_indices):
+        # Blend original dengan warna merah hanya di area kanker
+        roi_blended = cv2.addWeighted(original_bgr, 1 - alpha, color_mask, alpha, 0)
+        res[mask_indices] = roi_blended[mask_indices]
+
     if SHOW_NORMAL_OVERLAY:
-        color_mask[mask == 0] = (0, 255, 0)  # Hijau untuk area normal
+        # Contoh jika ingin area normal diberi warna hijau transparan
+        normal_mask = np.zeros_like(original_bgr, dtype=np.uint8)
+        normal_mask[mask == 0] = (0, 255, 0) # Green
+        normal_indices = (mask == 0)
+        normal_blended = cv2.addWeighted(original_bgr, 0.8, normal_mask, 0.2, 0)
+        res[normal_indices] = normal_blended[normal_indices]
 
-    return cv2.addWeighted(original_bgr, 1 - alpha, color_mask, alpha, 0)
-
+    return res
+    
 
 def create_binary_mask_image(mask: np.ndarray) -> np.ndarray:
     """Grayscale: kanker=putih (255), normal=hitam (0)."""
