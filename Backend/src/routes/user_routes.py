@@ -18,6 +18,13 @@ def add_user():
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
+        result = create_user(data)
+        
+        if result.get("status") == "error":
+            # Return the exact message from create_user
+            return jsonify({"error": result.get("message")}), 409
+            
+        return jsonify(result.get("data")), 201
         result = SignUpController.sign_up(data)
         if result.get("status") == "success":
             return jsonify(result), 201
