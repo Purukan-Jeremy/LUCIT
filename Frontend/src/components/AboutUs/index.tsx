@@ -15,8 +15,8 @@ function AboutUs() {
   };
 
   return (
-    <>
-      <section className="about-hero-section" id="about">
+    <div className="about-main-wrapper" id="about">
+      <section className="about-hero-section">
         <div className="about-hero-container">
           <div className="about-hero-content">
             <span className="medical-badge">Classification & Segmentation</span>
@@ -136,7 +136,7 @@ function AboutUs() {
           </div>
         </div>
       </section>
-    </>
+    </div>
   );
 }
 
