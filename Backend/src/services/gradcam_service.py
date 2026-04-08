@@ -102,8 +102,4 @@ def overlay_heatmap(original_img, heatmap, alpha=0.4, blur=True, invert=False):
 
     superimposed_img = cv2.addWeighted(original_img, 1 - alpha, heatmap_color, alpha, 0)
     
-<<<<<<< HEAD
     return superimposed_img
-=======
-    return superimposed_img
->>>>>>> 5cd513b7aaed11bcf82c0f962059743e0015108f

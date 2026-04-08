@@ -126,8 +126,4 @@ def logout_user():
 
 
 def check_user_session():
-<<<<<<< HEAD
     return SessionCheckController.check_session()
-=======
-    return SessionCheckController.check_session()
->>>>>>> 5cd513b7aaed11bcf82c0f962059743e0015108f
