@@ -149,8 +149,4 @@ def clear_model_cache(model_name=None):
     else:
         _model_cache = {}
     tf.keras.backend.clear_session()
-<<<<<<< HEAD
     print("[ModelLoader] Model cache cleared")
-=======
-    print("[ModelLoader] Model cache cleared")
->>>>>>> 5cd513b7aaed11bcf82c0f962059743e0015108f

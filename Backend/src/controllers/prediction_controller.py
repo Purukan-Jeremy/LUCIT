@@ -350,8 +350,4 @@ def filter_history(query):
     return HistoryController.filter_history(query)
 
 
-<<<<<<< HEAD
 AnalysisController = ImageController
-=======
-AnalysisController = ImageController
->>>>>>> 5cd513b7aaed11bcf82c0f962059743e0015108f
