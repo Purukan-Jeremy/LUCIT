@@ -2,11 +2,11 @@ import "../../assets/style.css";
 
 function AboutUs() {
   const sampleImages = [
+    { title: "Lung Adenocarcinoma", src: "/images/lung_aca.png" },
+    { title: "Lung Squamous Carcinoma", src: "/images/lung_scc.png" },
+    { title: "Lung Benign", src: "/images/lung_n.png" },
     { title: "Colon Adenocarcinoma", src: "/images/colon_aca.png" },
     { title: "Colon Benign", src: "/images/colon_n.png" },
-    { title: "Lung Adenocarcinoma", src: "/images/lung_aca.png" },
-    { title: "Lung Benign", src: "/images/lung_n.png" },
-    { title: "Lung Squamous Carcinoma", src: "/images/lung_scc.png" },
   ];
 
   const handleSeeMoreClick = () => {
@@ -21,7 +21,11 @@ function AboutUs() {
           <div className="about-hero-content">
             <span className="medical-badge">Classification & Segmentation</span>
             <h2 className="about-main-title">
-              Advancing Digital Pathology with <span className="text-highlight">LUCIT</span>
+              Advancing Digital Pathology with{" "}
+              <span className="about-title-brand" aria-label="LUCIT">
+                <span className="logo-lu">LU</span>
+                <span className="logo-cit">CIT</span>
+              </span>
             </h2>
             <p className="about-main-lead">
               LUCIT your histopathology Ai. LUCIT is a cutting-edge AI-powered diagnostic assistant designed to revolutionize the field of digital pathology.
@@ -35,10 +39,6 @@ function AboutUs() {
               >
                 Explore Methodology
               </button>
-              <div className="clinical-note">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
-                <span>Validated using LC25000 Dataset.</span>
-              </div>
             </div>
           </div>
         </div>
@@ -63,7 +63,7 @@ function AboutUs() {
             </div>
             <h3>Model Architecture</h3>
             <p>
-              We utilize <strong>CNN - Model Architecture</strong> for high-speed classification and <strong>U-Net</strong> for Segmentation. 
+              We utilize <strong>CNN Architecture</strong> for high-speed classification and <strong>U-Net</strong> for Segmentation. 
               Both models are optimized for 224x224 pixel input with optimizer
               achieve the best performance. The classification model achieves a validation accuracy that can be trusted, while the segmentation model provides precise localization of pathological features.
             </p>
@@ -88,7 +88,7 @@ function AboutUs() {
           </div>
           <div className="stat-pill">
             <span className="stat-label">Model Type</span>
-            <span className="stat-value">CNN - Model Architecture</span>
+            <span className="stat-value">CNN Architecture</span>
           </div>
           <div className="stat-pill">
             <span className="stat-label">Input Resolution</span>
@@ -97,7 +97,7 @@ function AboutUs() {
         </div>
 
         <div className="sample-gallery">
-          <h3 className="section-subtitle">Visual Classification Reference</h3>
+          <h3 className="section-subtitle">Visual Reference</h3>
           <div className="gallery-grid">
             {sampleImages.map((item) => (
               <figure className="gallery-item" key={item.title}>

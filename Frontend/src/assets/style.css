@@ -3708,6 +3708,11 @@ button {
   color: var(--medical-accent);
 }
 
+.about-title-brand {
+  display: inline-flex;
+  gap: 0.02em;
+}
+
 .about-main-lead {
   font-size: 19px;
   line-height: 1.7;
