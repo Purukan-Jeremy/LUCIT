@@ -40,13 +40,27 @@ const AnalysisPage: React.FC = () => {
 
   const [predictionResult, setPredictionResult] = useState<{
     status?: string;
+    model_type?: string;
+    // classification fields
     prediction?: string;
     confidence?: number;
     gradcam_heatmap?: string;
     gradcam_image?: string;
-    segmentation_mask?: string;
     ai_description?: string;
     warning?: string;
+    // segmentation fields
+    mask_image?: string;
+    overlay_image?: string;
+    segmentation_mask?: string; // Keep for compatibility
+    area_stats?: {
+      cancer_percent?: number;
+      normal_percent?: number;
+      cancer_pixels?: number;
+      total_pixels?: number;
+      tumor_area?: number; // From backend service
+      total_area?: number; // From backend service
+    };
+    // error
     error?: string;
     message?: string;
   } | null>(null);
@@ -106,33 +120,46 @@ const AnalysisPage: React.FC = () => {
     return "unknown";
   };
 
-  const saveAnalysisToHistory = (data: {
-    prediction?: string;
-    confidence?: number;
-    ai_description?: string;
-    gradcam_heatmap?: string;
-    gradcam_image?: string;
-    segmentation_mask?: string;
-  }) => {
-    const confidenceValue =
-      typeof data.confidence === "number"
+  const saveAnalysisToHistory = (data: typeof predictionResult) => {
+    if (!data) return;
+
+    const isSegmentation = data.model_type === "segmentation";
+
+    const cancerPercent = data.area_stats?.cancer_percent ?? 
+                         (data.area_stats?.tumor_area && data.area_stats?.total_area 
+                          ? ((data.area_stats.tumor_area / data.area_stats.total_area) * 100).toFixed(2) 
+                          : "N/A");
+
+    const confidenceValue = isSegmentation
+      ? `Tumor area: ${cancerPercent}%`
+      : typeof data.confidence === "number"
         ? `${(data.confidence * 100).toFixed(2)}%`
         : "N/A";
+
     const heatmapImage = data.gradcam_heatmap
       ? `data:image/jpeg;base64,${data.gradcam_heatmap}`
-      : "";
+      : data.mask_image
+        ? `data:image/png;base64,${data.mask_image}`
+        : data.segmentation_mask
+          ? `data:image/png;base64,${data.segmentation_mask}`
+          : "";
+
     const overlayImage = data.gradcam_image
       ? `data:image/jpeg;base64,${data.gradcam_image}`
-      : data.segmentation_mask
-        ? `data:image/png;base64,${data.segmentation_mask}`
+      : data.overlay_image
+        ? `data:image/jpeg;base64,${data.overlay_image}`
         : "";
+
+    const predictionLabel = isSegmentation
+      ? `Segmentation: ${cancerPercent}% Tumor`
+      : formatPredictionLabel(data.prediction);
 
     const entry = {
       id: Date.now(),
-      prediction: formatPredictionLabel(data.prediction),
+      prediction: predictionLabel,
       confidence: confidenceValue,
       createdAt: new Date().toISOString(),
-      model: modelType === "classification" ? "Classification" : "Segmentation",
+      model: isSegmentation ? "Segmentation" : "Classification",
       description: data.ai_description || "No AI description available.",
       variant: inferVariant(data.prediction),
       originalImage: selectedPreview,
@@ -154,6 +181,34 @@ const AnalysisPage: React.FC = () => {
   };
 
   const getDescriptionText = () => {
+    if (predictionResult?.model_type === "segmentation") {
+      const stats = predictionResult.area_stats;
+      const text = (predictionResult?.ai_description || "").trim();
+      if (text) return text;
+
+      if (stats) {
+        const tumorArea = stats.tumor_area ?? stats.cancer_pixels ?? 0;
+        const totalArea = stats.total_area ?? stats.total_pixels ?? 1;
+        const cancerPercent = stats.cancer_percent ?? ((tumorArea / totalArea) * 100);
+        
+        const level =
+          cancerPercent > 50
+            ? "more than half"
+            : cancerPercent > 25
+              ? "a significant portion"
+              : "a minor portion";
+              
+        return (
+          `The segmentation model identified regions of interest covering approximately ${cancerPercent.toFixed(2)}% ` +
+          `of the tissue area. This means ${level} of the analyzed tissue shows morphological characteristics flagged by the model. ` +
+          `The segmentation mask and red overlay highlight these specific areas for further review. ` +
+          `This result is intended as decision-support only and should be reviewed by a qualified pathologist ` +
+          `alongside clinical findings before any diagnostic conclusion is made.`
+        );
+      }
+      return "Segmentation analysis complete. Please review the mask and overlay images above.";
+    }
+
     const text = (predictionResult?.ai_description || "").trim();
     if (text) return text;
 
@@ -204,14 +259,25 @@ const AnalysisPage: React.FC = () => {
 
       setPredictionResult(data);
 
-      if (data.gradcam_heatmap) {
-        setHeatmapPreview(`data:image/jpeg;base64,${data.gradcam_heatmap}`);
-      }
-
-      if (data.gradcam_image) {
-        setOverlayPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
-      } else if (data.segmentation_mask) {
-        setOverlayPreview(`data:image/png;base64,${data.segmentation_mask}`);
+      if (data.model_type === "segmentation") {
+        if (data.mask_image) {
+          setHeatmapPreview(`data:image/png;base64,${data.mask_image}`);
+        } else if (data.segmentation_mask) {
+          setHeatmapPreview(`data:image/png;base64,${data.segmentation_mask}`);
+        }
+        
+        if (data.overlay_image) {
+          setOverlayPreview(`data:image/jpeg;base64,${data.overlay_image}`);
+        } else if (data.gradcam_image) {
+          setOverlayPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
+        }
+      } else {
+        if (data.gradcam_heatmap) {
+          setHeatmapPreview(`data:image/jpeg;base64,${data.gradcam_heatmap}`);
+        }
+        if (data.gradcam_image) {
+          setOverlayPreview(`data:image/jpeg;base64,${data.gradcam_image}`);
+        }
       }
 
       saveAnalysisToHistory(data);
@@ -314,6 +380,7 @@ const AnalysisPage: React.FC = () => {
             confidence: predictionResult?.confidence,
             ai_description: predictionResult?.ai_description,
             warning: predictionResult?.warning,
+            area_stats: predictionResult?.area_stats,
           },
           chat_history: chatMessages,
         }),
@@ -342,6 +409,12 @@ const AnalysisPage: React.FC = () => {
       setIsChatLoading(false);
     }
   };
+
+  const isSegmentation = predictionResult?.model_type === "segmentation";
+  const heatmapLabel = isSegmentation ? "Binary Mask" : "Grad-CAM Heatmap";
+  const overlayLabel = isSegmentation ? "Overlay (Red=ROI)" : "Grad-CAM Overlay";
+  const heatmapEmpty = isSegmentation ? "Mask not available" : "Heatmap not available";
+  const overlayEmpty = isSegmentation ? "Overlay not available" : "Overlay not available";
 
   return (
     <div className={`analysis-container ${chatOpen ? "chat-open" : ""}`}>
@@ -503,20 +576,45 @@ const AnalysisPage: React.FC = () => {
                   <div className="result-metrics">
                     <h3 style={{ marginBottom: "0.5rem" }}>Analysis Results</h3>
                     <div className="metrics-center">
-                      <p>
-                        <span className="metric-label">Prediction:</span>
-                        <span className="metric-value" style={{ color: "#ffffff" }}>
-                          {formatPredictionLabel(predictionResult?.prediction) || "N/A"}
-                        </span>
-                      </p>
-                      <p>
-                        <span className="metric-label">Confidence:</span>
-                        <span className="metric-value">
-                          {predictionResult?.confidence
-                            ? `${(predictionResult.confidence * 100).toFixed(2)}%`
-                            : "N/A"}
-                        </span>
-                      </p>
+                      {isSegmentation ? (
+                        <>
+                          <p>
+                            <span className="metric-label">Tumor Area:</span>
+                            <span className="metric-value" style={{ color: "#ff6b6b" }}>
+                              {predictionResult.area_stats?.cancer_percent?.toFixed(2) ?? 
+                               (predictionResult.area_stats?.tumor_area && predictionResult.area_stats?.total_area 
+                                ? ((predictionResult.area_stats.tumor_area / predictionResult.area_stats.total_area) * 100).toFixed(2) 
+                                : "N/A")}%
+                            </span>
+                          </p>
+                          <p>
+                            <span className="metric-label">Normal Area:</span>
+                            <span className="metric-value" style={{ color: "#ffffff" }}>
+                              {predictionResult.area_stats?.normal_percent?.toFixed(2) ?? 
+                               (predictionResult.area_stats?.tumor_area && predictionResult.area_stats?.total_area 
+                                ? (100 - (predictionResult.area_stats.tumor_area / predictionResult.area_stats.total_area) * 100).toFixed(2) 
+                                : "N/A")}%
+                            </span>
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p>
+                            <span className="metric-label">Prediction:</span>
+                            <span className="metric-value" style={{ color: "#ffffff" }}>
+                              {formatPredictionLabel(predictionResult?.prediction) || "N/A"}
+                            </span>
+                          </p>
+                          <p>
+                            <span className="metric-label">Confidence:</span>
+                            <span className="metric-value">
+                              {predictionResult?.confidence
+                                ? `${(predictionResult.confidence * 100).toFixed(2)}%`
+                                : "N/A"}
+                            </span>
+                          </p>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -535,31 +633,31 @@ const AnalysisPage: React.FC = () => {
                     </div>
 
                     <div className="result-visual-card">
-                      <div className="result-visual-title">Grad-CAM Heatmap</div>
+                      <div className="result-visual-title">{heatmapLabel}</div>
                       {heatmapPreview ? (
                         <img
                           src={heatmapPreview}
-                          alt="Grad-CAM heatmap"
+                          alt={heatmapLabel}
                           className="result-visual-image"
                         />
                       ) : (
                         <div className="result-visual-empty">
-                          Heatmap not available
+                          {heatmapEmpty}
                         </div>
                       )}
                     </div>
 
                     <div className="result-visual-card">
-                      <div className="result-visual-title">Grad-CAM Overlay</div>
+                      <div className="result-visual-title">{overlayLabel}</div>
                       {overlayPreview ? (
                         <img
                           src={overlayPreview}
-                          alt="Grad-CAM overlay"
+                          alt={overlayLabel}
                           className="result-visual-image"
                         />
                       ) : (
                         <div className="result-visual-empty">
-                          Overlay not available
+                          {overlayEmpty}
                         </div>
                       )}
                     </div>

@@ -64,13 +64,18 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           }),
         });
 
+        console.log("Registration response status:", response.status);
         const result = await parseApiBody(response);
+        console.log("Registration response body:", result);
+
         if (response.ok) {
           setMessage({ type: "success", text: "Account created successfully! You can now login." });
           setIsSignUp(false);
           setFormData({ fullName: "", email: "", password: "" });
         } else {
-          throw new Error(result.error || "Failed to sign up");
+          // If response is not ok (e.g., 409 Conflict), throw the specific error message from the backend
+          const errorMsg = result.error || "Failed to sign up";
+          throw new Error(errorMsg);
         }
       } catch (err) {
         const text =
@@ -101,9 +106,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             fullname: result.user.fullname,
             email: result.user.email,
           };
+          
+          // Provide positive feedback
+          setMessage({ 
+            type: "success", 
+            text: `Welcome back, ${userData.fullname}! Signing you in...` 
+          });
+
           storeAuthenticatedUser(userData);
           onLoginSuccess(userData);
-          onClose();
+          
+          // Brief delay to allow the user to read the success message
+          setTimeout(() => {
+            onClose();
+          }, 1200);
         } else {
           throw new Error(result.message || "Invalid credentials");
         }
@@ -250,7 +266,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             </div>
 
             <button type="submit" className="submit-btn" disabled={isLoading}>
-              {isLoading ? "Processing..." : (isSignUp ? "Sign Up" : "Sign In")}
+              {isLoading ? (
+                <>
+                  <span className="button-spinner" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                isSignUp ? "Sign Up" : "Sign In"
+              )}
             </button>
           </form>
 
