@@ -106,9 +106,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             fullname: result.user.fullname,
             email: result.user.email,
           };
+          
+          // Provide positive feedback
+          setMessage({ 
+            type: "success", 
+            text: `Welcome back, ${userData.fullname}! Signing you in...` 
+          });
+
           storeAuthenticatedUser(userData);
           onLoginSuccess(userData);
-          onClose();
+          
+          // Brief delay to allow the user to read the success message
+          setTimeout(() => {
+            onClose();
+          }, 1200);
         } else {
           throw new Error(result.message || "Invalid credentials");
         }
@@ -255,7 +266,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             </div>
 
             <button type="submit" className="submit-btn" disabled={isLoading}>
-              {isLoading ? "Processing..." : (isSignUp ? "Sign Up" : "Sign In")}
+              {isLoading ? (
+                <>
+                  <span className="button-spinner" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                isSignUp ? "Sign Up" : "Sign In"
+              )}
             </button>
           </form>
 
