@@ -24,40 +24,35 @@ function Footer() {
         <div className="footer-nav">
           <div className="footer-column">
             <h4>Methodology</h4>
-            <a href="#about">LC25000 Dataset</a>
-            <a href="#about">Explainable AI</a>
-            <a href="#features">Grad-CAM Visualization</a>
-            <a href="#features">MobileNetV2 Architecture</a>
+            <a href="about">LC25000 Dataset</a>
+            <a href="about">Explainable AI</a>
+            <a href="features">Grad-CAM Visualization</a>
+            <a href="features">CNN Architecture</a>
           </div>
 
           <div className="footer-column">
-            <h4>Support</h4>
-            <a href="#">User Documentation</a>
-            <a href="#">Security Overview</a>
-            <a href="#">Privacy Policy</a>
-            <a href="#">Terms of Use</a>
+            <h4>Contributor</h4>
+            <a href="">University of Klabat</a>
+            <a href="">Jeremy Purukan</a>
+            <a href="">Steve Umbas</a>
+            <a href="">Jonathan Taufik</a>
           </div>
 
           <div className="footer-column">
             <h4>Clinical Connect</h4>
-            <a href="#">Pathology Resources</a>
-            <a href="#">Research Publications</a>
-            <a href="#">Collaborate</a>
-            <a href="#">Contact Support</a>
+            <a href="">Pathology Resources</a>
+            <a href="">Research Publications</a>
+            <a href="">Collaborate</a>
+            <a href="">Contact Support</a>
           </div>
         </div>
       </div>
 
       <div className="footer-bottom-cozy">
         <div className="footer-legal">
-          <span>&copy; {currentYear} LUCIT AI Team. All rights reserved.</span>
+          <span>&copy; {currentYear} LUCIT Team. All rights reserved.</span>
           <span className="dot-divider"></span>
           <span>Open-Source for Research</span>
-        </div>
-        <div className="footer-socials">
-          <a href="#" aria-label="LinkedIn">LN</a>
-          <a href="#" aria-label="Twitter">TW</a>
-          <a href="#" aria-label="GitHub">GH</a>
         </div>
       </div>
     </footer>
