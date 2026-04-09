@@ -12,6 +12,7 @@ function Header() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [user, setUser] = useState<{ fullname: string; email: string } | null>(() =>
     readStoredUser(),
   );
@@ -37,7 +38,10 @@ function Header() {
   const openLoginModal = () => setIsLoginModalOpen(true);
   const closeLoginModal = () => setIsLoginModalOpen(false);
   const openLogoutModal = () => setIsLogoutModalOpen(true);
-  const closeLogoutModal = () => setIsLogoutModalOpen(false);
+  const closeLogoutModal = () => {
+    setIsLogoutModalOpen(false);
+    setIsLoggingOut(false);
+  };
   const toggleMenu = () => setIsMenuOpen((prev) => !prev);
   const closeMenu = () => setIsMenuOpen(false);
 
@@ -46,11 +50,17 @@ function Header() {
   };
 
   const handleLogout = () => {
-    logoutUser("manual");
-    setUser(null);
-    setIsLogoutModalOpen(false);
-    setShowProfileDropdown(false);
-    navigate("/");
+    setIsLoggingOut(true);
+    
+    // Simulate a brief delay for smoother transition
+    setTimeout(() => {
+      logoutUser("manual");
+      setUser(null);
+      setIsLoggingOut(false);
+      setIsLogoutModalOpen(false);
+      setShowProfileDropdown(false);
+      navigate("/");
+    }, 800);
   };
 
   useEffect(() => {
@@ -255,8 +265,16 @@ function Header() {
                 type="button"
                 className="logout-modal-button logout-modal-button-primary"
                 onClick={handleLogout}
+                disabled={isLoggingOut}
               >
-                Yes
+                {isLoggingOut ? (
+                  <>
+                    <span className="button-spinner" />
+                    <span>Signing out...</span>
+                  </>
+                ) : (
+                  "Yes"
+                )}
               </button>
             </div>
           </div>

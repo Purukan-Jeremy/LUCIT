@@ -63,9 +63,9 @@ function AboutUs() {
             </div>
             <h3>Model Architecture</h3>
             <p>
-              We utilize <strong>EfficientNetB3</strong> for high-speed classification and <strong>U-Net</strong> for Segmentation. 
+              We utilize <strong>CNN - Model Architecture</strong> for high-speed classification and <strong>U-Net</strong> for Segmentation. 
               Both models are optimized for 224x224 pixel input with optimizer
-              achieve the best performance. The classification model achieves a validation accuracy of 99.99%, while the segmentation model provides precise localization of pathological features.
+              achieve the best performance. The classification model achieves a validation accuracy that can be trusted, while the segmentation model provides precise localization of pathological features.
             </p>
           </div>
           <div className="info-card">
@@ -88,7 +88,7 @@ function AboutUs() {
           </div>
           <div className="stat-pill">
             <span className="stat-label">Model Type</span>
-            <span className="stat-value">EfficientNetB3</span>
+            <span className="stat-value">CNN - Model Architecture</span>
           </div>
           <div className="stat-pill">
             <span className="stat-label">Input Resolution</span>
