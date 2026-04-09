@@ -19,9 +19,9 @@ const featureItems: FeatureItem[] = [
     ),
   },
   {
-    title: "Explainable AI (Grad-CAM)",
+    title: "U-Net Segmentation for Tumor Localization",
     description:
-      "Bridging the gap between AI predictions and clinical reasoning. Grad-CAM (Gradient-weighted Class Activation Mapping) visually highlights the specific regions within the histopathology image that the model focused on to make its diagnosis.",
+      "Our U-Net-based segmentation tool provides pixel-level delineation of tumor regions within histopathological images. This allows pathologists to visualize the extent and morphology of cancerous tissues, facilitating more accurate diagnoses and treatment planning.",
     icon: (
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="10"/>
