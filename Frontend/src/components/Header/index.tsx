@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import "../../assets/style.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import LoginModal from "../LoginModal";
 import { logoutUser, readStoredUser } from "../../utils/session";

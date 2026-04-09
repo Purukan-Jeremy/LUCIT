@@ -5,12 +5,20 @@ from src.config.settings import FLASK_SECRET_KEY
 from src.controllers.prediction_controller import filter_history, get_history, predict_image
 from src.models.model_loader import load_model
 from src.routes.chatbot_routes import chatbot_bp
+from src.routes.user_routes import user_bp
+from src.routes.prediction_routes import prediction_bp
 
 app = Flask(__name__)
+CORS(app)
+
+# Register Blueprints
 app.config["SECRET_KEY"] = FLASK_SECRET_KEY
 CORS(app)  
 app.register_blueprint(chatbot_bp)
+app.register_blueprint(user_bp)
+app.register_blueprint(prediction_bp, url_prefix="/api")
 
+# Preload model on startup
 try:
     load_model()
 except Exception as preload_error:
@@ -22,14 +30,23 @@ def root():
 
 @app.route("/testing", methods=["GET"])
 def test_supabase():
-    res = supabase.table("users").select("*").limit(1).execute()
-    return jsonify({
-        "success": True,
-        "data": res.data
-    })
+    try:
+        # Check if tbl_users exists instead of 'users' to match your schema
+        # Falls back to 'users' if 'tbl_users' is not the one intended, 
+        # but following existing project convention of 'tbl_users'.
+        res = supabase.table("tbl_users").select("*").limit(1).execute()
+        return jsonify({
+            "success": True,
+            "data": res.data
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/users", methods=["GET"])
 def get_users():
+    """
+    Endpoint untuk mendapatkan daftar user (jika diperlukan)
+    """
     try:
         from src.controllers.user_controller import UserController
         users = UserController.get_users()

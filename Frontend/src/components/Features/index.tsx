@@ -1,35 +1,54 @@
+import React from "react";
+import "../../assets/style.css";
+
 type FeatureItem = {
   title: string;
   description: string;
-  icon: string;
-  iconClassName?: string;
+  icon: React.ReactNode;
 };
 
 const featureItems: FeatureItem[] = [
   {
     title: "AI-Based Cancer Classification",
     description:
-      "The system utilizes deep learning models trained on the LC25000 dataset to classify histopathology images of lung and colon cancer. This feature helps identify cancer types efficiently, supporting doctors in making faster and more informed decisions.",
-    icon: "/images/classification.png",
+      "Our system leverages advanced deep learning to classify pulmonary and colorectal tissue with high precision. By identifying morphological abnormalities in cellular structures, it assists in the differentiation between malignant and benign samples.",
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>
+      </svg>
+    ),
   },
   {
-    title: "AI-Based Cancer Segmentation",
+    title: "Explainable AI (Grad-CAM)",
     description:
-      "This feature highlights and segments cancerous regions within histopathology images. By providing clear visualization of affected areas, the system enhances interpretability and assists medical professionals in detailed analysis.",
-    icon: "/images/segmentation.png",
-    iconClassName: "features-icon-segmentation",
+      "Bridging the gap between AI predictions and clinical reasoning. Grad-CAM (Gradient-weighted Class Activation Mapping) visually highlights the specific regions within the histopathology image that the model focused on to make its diagnosis.",
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 8v8M8 12h8"/>
+      </svg>
+    ),
   },
   {
-    title: "History",
+    title: "Analysis History & Archiving",
     description:
-      "All analysis results are securely stored and organized, allowing users to revisit previous classifications and segmentations. This ensures better tracking, comparison, and documentation of patient data over time.",
-    icon: "/images/history (2).png",
+      "Maintain a robust digital archive of all past analyses. This feature allows for chronological tracking of patient samples, facilitating comparative studies and ensuring that every prediction is documented for future reference.",
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 8v4l3 3"/>
+        <circle cx="12" cy="12" r="10"/>
+      </svg>
+    ),
   },
   {
-    title: "AI Chatbot",
+    title: "Context-Aware Medical Chatbot",
     description:
-      "An AI-powered chatbot provides real-time assistance by explaining analysis results, offering information about lung and colon cancer, and guiding users in using the system effectively.",
-    icon: "/images/chatbot.png",
+      "A specialized AI assistant integrated directly into the analysis workflow. The chatbot can interpret current results, provide definitions of pathological terms, and guide users through the implications of the AI findings.",
+    icon: (
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    ),
   },
 ];
 
@@ -38,24 +57,24 @@ function Features() {
     <section className="features-section" id="features">
       <div className="features-shell">
         <div className="features-heading-block">
-          <h2 className="features-heading">Features</h2>
+          <span className="features-kicker">Core Capabilities</span>
+          <h2 className="features-heading">Intelligent Diagnostic Tools</h2>
           <p className="features-intro">
-            Main tools in LUCIT for histopathology analysis, result review,
-            and guided interpretation.
+            LUCIT provides a comprehensive suite of tools designed to augment the 
+            digital pathology workflow with precision, clarity, and accountability.
           </p>
         </div>
 
         <div className="features-grid">
           {featureItems.map((item) => (
-            <article className="features-item" key={item.title}>
-              <div className="features-item-header">
-                <div className={`features-item-icon ${item.iconClassName ?? ""}`}>
-                  <img src={item.icon} alt="" aria-hidden="true" />
-                </div>
-                <h3>{item.title}</h3>
+            <article className="features-item-cozy" key={item.title}>
+              <div className="features-item-icon-cozy">
+                {item.icon}
               </div>
-
-              <p>{item.description}</p>
+              <div className="features-item-content">
+                <h3>{item.title}</h3>
+                <p className="features-description">{item.description}</p>
+              </div>
             </article>
           ))}
         </div>

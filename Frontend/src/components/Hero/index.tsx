@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import "../../assets/style.css";
 import { hasActiveSession } from "../../utils/session";
 // Pastikan CSS Hero sudah terhubung (biasanya via global style.css)
 
