@@ -240,24 +240,22 @@ def _run_segmentation(contents: bytes) -> dict:
     print("[Segmentation] Generating AI description...")
     try:
         area_stats = seg_result.get("area_stats", {})
-        tumor_area = area_stats.get("tumor_area", 0)
-        total_area = area_stats.get("total_area", 1)
-
-        tumor_percentage = (tumor_area / total_area) * 100 if total_area > 0 else 0
+        # Use cancer_percent directly from area_stats
+        cancer_percentage = area_stats.get("cancer_percent", 0.0)
 
         # Interpretasi level
-        if tumor_percentage > 50:
-            severity = "extensive tumor involvement"
-        elif tumor_percentage > 20:
-            severity = "moderate tumor involvement"
-        elif tumor_percentage > 5:
-            severity = "small tumor region detected"
+        if cancer_percentage > 50:
+            severity = "extensive cancer involvement"
+        elif cancer_percentage > 20:
+            severity = "moderate cancer involvement"
+        elif cancer_percentage > 5:
+            severity = "small cancer region detected"
         else:
-            severity = "minimal or no significant tumor region"
+            severity = "minimal or no significant cancer region"
 
         ai_description = (
             f"The segmentation model identified regions of interest within the histopathology image. "
-            f"Approximately {tumor_percentage:.2f}% of the tissue area is classified as tumor region, "
+            f"Approximately {cancer_percentage:.2f}% of the tissue area is classified as cancer region, "
             f"suggesting {severity}. The segmentation mask highlights areas that are morphologically "
             f"different from surrounding tissue. This result is intended as a decision-support tool "
             f"and should not be used as a standalone medical diagnosis. Expert pathology review is recommended."
@@ -266,7 +264,7 @@ def _run_segmentation(contents: bytes) -> dict:
     except Exception as e:
         print("[Segmentation] AI description error:", e)
         ai_description = (
-            "The segmentation model generated a tumor mask, but additional interpretation "
+            "The segmentation model generated a cancer mask, but additional interpretation "
             "could not be completed. Please refer to the visual output and consult a medical expert."
         )
 
@@ -305,6 +303,12 @@ class ImageController:
             return {
                 "status": "error",
                 "message": "Not Histopathology Image"
+            }
+
+        if model_type == "none":
+            return {
+                "status": "error", 
+                "message": "No model selected. Please select Classification or Segmentation."
             }
 
         if model_type == "classification":

@@ -154,6 +154,8 @@ def compute_area_stats(mask: np.ndarray) -> dict:
         "normal_percent": round((total - cancer_pixels) / total * 100, 2),
         "cancer_pixels": cancer_pixels,
         "total_pixels": total,
+        "cancer_area": cancer_pixels,
+        "total_area": total,
     }
 
 
