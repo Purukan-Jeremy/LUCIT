@@ -48,7 +48,7 @@ const featureItems: FeatureItem[] = [
   {
     title: "U-Net Segmentation for Cancer",
     description:
-      "Our U-Net-based segmentation tool provides pixel-level delineation of tumor regions within histopathological images. This allows pathologists to visualize the extent and morphology of cancerous tissues, facilitating more accurate diagnoses and treatment planning.",
+      "Our U-Net-based segmentation tool provides pixel-level delineation of cancer regions within histopathological images. This allows pathologists to visualize the extent and morphology of cancerous tissues, facilitating more accurate diagnoses and treatment planning.",
     icon: (
       <svg
         width="40"

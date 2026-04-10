@@ -34,7 +34,7 @@ def _is_analysis_related(message: str, analysis_context: dict, chat_history: lis
         "overlay",
         "histopatologi",
         "jaringan",
-        "tumor",
+        "cancer",
         "kanker",
         "lung",
         "colon",
