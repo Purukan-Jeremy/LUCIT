@@ -16,6 +16,7 @@ from src.services.gradcam_service import (
 )
 from src.services.ai_validator_service import (
     generate_ai_description,
+    generate_ai_description_segmentation,
     validate_histopathology,
 )
 from src.services.segmentation_service import run_segmentation
@@ -238,37 +239,11 @@ def _run_segmentation(contents: bytes) -> dict:
     )
 
     print("[Segmentation] Generating AI description...")
-    try:
-        area_stats = seg_result.get("area_stats", {})
-        tumor_area = area_stats.get("tumor_area", 0)
-        total_area = area_stats.get("total_area", 1)
-
-        tumor_percentage = (tumor_area / total_area) * 100 if total_area > 0 else 0
-
-        # Interpretasi level
-        if tumor_percentage > 50:
-            severity = "extensive tumor involvement"
-        elif tumor_percentage > 20:
-            severity = "moderate tumor involvement"
-        elif tumor_percentage > 5:
-            severity = "small tumor region detected"
-        else:
-            severity = "minimal or no significant tumor region"
-
-        ai_description = (
-            f"The segmentation model identified regions of interest within the histopathology image. "
-            f"Approximately {tumor_percentage:.2f}% of the tissue area is classified as tumor region, "
-            f"suggesting {severity}. The segmentation mask highlights areas that are morphologically "
-            f"different from surrounding tissue. This result is intended as a decision-support tool "
-            f"and should not be used as a standalone medical diagnosis. Expert pathology review is recommended."
-        )
-
-    except Exception as e:
-        print("[Segmentation] AI description error:", e)
-        ai_description = (
-            "The segmentation model generated a tumor mask, but additional interpretation "
-            "could not be completed. Please refer to the visual output and consult a medical expert."
-        )
+    ai_description = generate_ai_description_segmentation(
+        image_bytes=contents,
+        area_stats=seg_result.get("area_stats", {}),
+        overlay_base64=seg_result.get("overlay_base64"),
+    )
 
     print("[Segmentation] Done.")
     return {

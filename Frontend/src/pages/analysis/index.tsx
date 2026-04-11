@@ -57,8 +57,6 @@ const AnalysisPage: React.FC = () => {
       normal_percent?: number;
       cancer_pixels?: number;
       total_pixels?: number;
-      tumor_area?: number; // From backend service
-      total_area?: number; // From backend service
     };
     // error
     error?: string;
@@ -67,7 +65,10 @@ const AnalysisPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [notice, setNotice] = useState<{ type: "info" | "error"; text: string } | null>(null);
+  const [notice, setNotice] = useState<{
+    type: "info" | "error";
+    text: string;
+  } | null>(null);
   const [modelSelectAttention, setModelSelectAttention] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -112,7 +113,9 @@ const AnalysisPage: React.FC = () => {
     );
   };
 
-  const inferVariant = (prediction?: string): "lung" | "colon" | "breast" | "unknown" => {
+  const inferVariant = (
+    prediction?: string,
+  ): "lung" | "colon" | "breast" | "unknown" => {
     const text = (prediction || "").toLowerCase();
     if (text.includes("lung")) return "lung";
     if (text.includes("colon")) return "colon";
@@ -125,10 +128,7 @@ const AnalysisPage: React.FC = () => {
 
     const isSegmentation = data.model_type === "segmentation";
 
-    const cancerPercent = data.area_stats?.cancer_percent ?? 
-                         (data.area_stats?.tumor_area && data.area_stats?.total_area 
-                          ? ((data.area_stats.tumor_area / data.area_stats.total_area) * 100).toFixed(2) 
-                          : "N/A");
+    const cancerPercent = data.area_stats?.cancer_percent?.toFixed(2) ?? "N/A";
 
     const confidenceValue = isSegmentation
       ? `Tumor area: ${cancerPercent}%`
@@ -187,17 +187,15 @@ const AnalysisPage: React.FC = () => {
       if (text) return text;
 
       if (stats) {
-        const tumorArea = stats.tumor_area ?? stats.cancer_pixels ?? 0;
-        const totalArea = stats.total_area ?? stats.total_pixels ?? 1;
-        const cancerPercent = stats.cancer_percent ?? ((tumorArea / totalArea) * 100);
-        
+        const cancerPercent = stats.cancer_percent ?? 0;
+
         const level =
           cancerPercent > 50
             ? "more than half"
             : cancerPercent > 25
               ? "a significant portion"
               : "a minor portion";
-              
+
         return (
           `The segmentation model identified regions of interest covering approximately ${cancerPercent.toFixed(2)}% ` +
           `of the tissue area. This means ${level} of the analyzed tissue shows morphological characteristics flagged by the model. ` +
@@ -215,7 +213,9 @@ const AnalysisPage: React.FC = () => {
     const prediction = formatPredictionLabel(predictionResult?.prediction);
     const confidence = predictionResult?.confidence;
     const confidenceText =
-      typeof confidence === "number" ? `${(confidence * 100).toFixed(2)}%` : "N/A";
+      typeof confidence === "number"
+        ? `${(confidence * 100).toFixed(2)}%`
+        : "N/A";
     const predictionLower = prediction.toLowerCase();
     const riskPhrase =
       predictionLower.includes("aca") ||
@@ -265,7 +265,7 @@ const AnalysisPage: React.FC = () => {
         } else if (data.segmentation_mask) {
           setHeatmapPreview(`data:image/png;base64,${data.segmentation_mask}`);
         }
-        
+
         if (data.overlay_image) {
           setOverlayPreview(`data:image/jpeg;base64,${data.overlay_image}`);
         } else if (data.gradcam_image) {
@@ -363,7 +363,10 @@ const AnalysisPage: React.FC = () => {
     const message = chatInput.trim();
     if (!message) return;
 
-    const historyForRequest = [...chatMessages, { role: "user", text: message }];
+    const historyForRequest = [
+      ...chatMessages,
+      { role: "user", text: message },
+    ];
     setChatMessages(historyForRequest);
     setChatInput("");
     setIsChatLoading(true);
@@ -391,19 +394,29 @@ const AnalysisPage: React.FC = () => {
       try {
         result = rawText ? JSON.parse(rawText) : {};
       } catch {
-        result = { status: "error", message: rawText || "Invalid server response" };
+        result = {
+          status: "error",
+          message: rawText || "Invalid server response",
+        };
       }
 
       const assistantText =
         response.ok && result.status === "success"
-          ? result.reply || "Maaf, saya tidak dapat menghasilkan jawaban saat ini."
+          ? result.reply ||
+            "Maaf, saya tidak dapat menghasilkan jawaban saat ini."
           : result.message || "Chatbot sedang tidak tersedia untuk sementara.";
 
-      setChatMessages((prev) => [...prev, { role: "assistant", text: assistantText }]);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: assistantText },
+      ]);
     } catch {
       setChatMessages((prev) => [
         ...prev,
-        { role: "assistant", text: "Chatbot sedang tidak tersedia untuk sementara." },
+        {
+          role: "assistant",
+          text: "Chatbot sedang tidak tersedia untuk sementara.",
+        },
       ]);
     } finally {
       setIsChatLoading(false);
@@ -412,9 +425,15 @@ const AnalysisPage: React.FC = () => {
 
   const isSegmentation = predictionResult?.model_type === "segmentation";
   const heatmapLabel = isSegmentation ? "Binary Mask" : "Grad-CAM Heatmap";
-  const overlayLabel = isSegmentation ? "Overlay (Red=ROI)" : "Grad-CAM Overlay";
-  const heatmapEmpty = isSegmentation ? "Mask not available" : "Heatmap not available";
-  const overlayEmpty = isSegmentation ? "Overlay not available" : "Overlay not available";
+  const overlayLabel = isSegmentation
+    ? "Overlay (Red=ROI)"
+    : "Grad-CAM Overlay";
+  const heatmapEmpty = isSegmentation
+    ? "Mask not available"
+    : "Heatmap not available";
+  const overlayEmpty = isSegmentation
+    ? "Overlay not available"
+    : "Overlay not available";
 
   return (
     <div className={`analysis-container ${chatOpen ? "chat-open" : ""}`}>
@@ -422,15 +441,19 @@ const AnalysisPage: React.FC = () => {
         <div className="analysis-hero">
           <h1>AI Histopathology Analysis</h1>
           <p className="analysis-hero-subtitle">
-            Select a model, upload a histopathology image, and review clear AI‑assisted
-            insights for classification or segmentation.
+            Select a model, upload a histopathology image, and review clear
+            AI‑assisted insights for classification or segmentation.
           </p>
         </div>
 
         {notice && (
           <div className={`notice notice-top ${notice.type}`}>
             <span>{notice.text}</span>
-            <button type="button" onClick={() => setNotice(null)} aria-label="Close notification">
+            <button
+              type="button"
+              onClick={() => setNotice(null)}
+              aria-label="Close notification"
+            >
               ×
             </button>
           </div>
@@ -438,131 +461,133 @@ const AnalysisPage: React.FC = () => {
 
         <div className="analysis-card">
           <div className="card-left">
-          <h2 className="upload-title">
-            {modelType === "classification"
-              ? "Upload image histopathology for classification"
-              : modelType === "segmentation"
-                ? "Upload image histopathology for segmentation"
-                : "Upload image histopathology"}
-          </h2>
+            <h2 className="upload-title">
+              {modelType === "classification"
+                ? "Upload image histopathology for classification"
+                : modelType === "segmentation"
+                  ? "Upload image histopathology for segmentation"
+                  : "Upload image histopathology"}
+            </h2>
 
-          <div className="upload-box">
-            <input
-              type="file"
-              id="file-upload"
-              accept="image/*"
-              onChange={handleImageChange}
-              ref={fileInputRef}
-              disabled={modelType === "none"}
-              hidden
-            />
-            <label
-              htmlFor="file-upload"
-              className={`upload-label ${modelType === "none" ? "disabled" : ""}`}
-              onClick={(event) => {
-                if (modelType === "none") {
-                  event.preventDefault();
-                  showNotice("info", "Please select a model first.");
-                  triggerModelSelectAttention();
-                }
-              }}
-            >
-              <div className="folder-icon">
-                <svg
-                  width="80"
-                  height="80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-                </svg>
-              </div>
-            </label>
-
-            <div
-              className={`model-select ${modelSelectAttention ? "attention" : ""}`}
-            >
-              <select
-                id="model-type"
-                className="model-dropdown"
-                value={modelType}
-                onChange={(event) =>
-                  setModelType(
-                    event.target.value as
-                      | "none"
-                      | "classification"
-                      | "segmentation",
-                  )
-                }
-                disabled={isAnalyzed}
-              >
-                <option value="none">Select Model</option>
-                <option value="classification">Classification</option>
-                <option value="segmentation">Segmentation</option>
-              </select>
-            </div>
-          </div>
-
-          {selectedPreview && !isAnalyzed && (
-            <div style={{ marginTop: "1rem" }}>
-              <img
-                src={selectedPreview}
-                alt="Selected preview"
-                className="selected-preview-image"
+            <div className="upload-box">
+              <input
+                type="file"
+                id="file-upload"
+                accept="image/*"
+                onChange={handleImageChange}
+                ref={fileInputRef}
+                disabled={modelType === "none"}
+                hidden
               />
+              <label
+                htmlFor="file-upload"
+                className={`upload-label ${modelType === "none" ? "disabled" : ""}`}
+                onClick={(event) => {
+                  if (modelType === "none") {
+                    event.preventDefault();
+                    showNotice("info", "Please select a model first.");
+                    triggerModelSelectAttention();
+                  }
+                }}
+              >
+                <div className="folder-icon">
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                  </svg>
+                </div>
+              </label>
+
+              <div
+                className={`model-select ${modelSelectAttention ? "attention" : ""}`}
+              >
+                <select
+                  id="model-type"
+                  className="model-dropdown"
+                  value={modelType}
+                  onChange={(event) =>
+                    setModelType(
+                      event.target.value as
+                        | "none"
+                        | "classification"
+                        | "segmentation",
+                    )
+                  }
+                  disabled={isAnalyzed}
+                >
+                  <option value="none">Select Model</option>
+                  <option value="classification">Classification</option>
+                  <option value="segmentation">Segmentation</option>
+                </select>
+              </div>
             </div>
-          )}
 
-          <button
-            className="primary-btn start-analysis-btn"
-            onClick={handleStartAnalysis}
-            disabled={!selectedImage || modelType === "none" || isLoading}
-            style={{
-              opacity:
-                !selectedImage || modelType === "none" || isLoading ? 0.6 : 1,
-              cursor:
-                !selectedImage || modelType === "none" || isLoading
-                  ? "not-allowed"
-                  : "pointer",
-            }}
-          >
-            {isLoading ? "Analyzing..." : "Start Analysis"}
-          </button>
+            {selectedPreview && !isAnalyzed && (
+              <div style={{ marginTop: "1rem" }}>
+                <img
+                  src={selectedPreview}
+                  alt="Selected preview"
+                  className="selected-preview-image"
+                />
+              </div>
+            )}
 
-          {isAnalyzed && (
             <button
-              className="primary-btn"
-              onClick={handleReset}
+              className="primary-btn start-analysis-btn"
+              onClick={handleStartAnalysis}
+              disabled={!selectedImage || modelType === "none" || isLoading}
               style={{
-                marginTop: "1rem",
-                backgroundColor: "#6c757d",
+                opacity:
+                  !selectedImage || modelType === "none" || isLoading ? 0.6 : 1,
+                cursor:
+                  !selectedImage || modelType === "none" || isLoading
+                    ? "not-allowed"
+                    : "pointer",
               }}
             >
-              Analyze Another Image
+              {isLoading ? "Analyzing..." : "Start Analysis"}
             </button>
-          )}
 
-          {selectedImage && !isAnalyzed && (
-            <p style={{ marginTop: "1rem", color: "#666", fontSize: "0.9rem" }}>
-              File selected: <strong>{selectedImage.name}</strong>
-            </p>
-          )}
+            {isAnalyzed && (
+              <button
+                className="primary-btn"
+                onClick={handleReset}
+                style={{
+                  marginTop: "1rem",
+                  backgroundColor: "#6c757d",
+                }}
+              >
+                Analyze Another Image
+              </button>
+            )}
 
-          {error && (
-            <div
-              className="analysis-error-panel"
-              style={{
-                marginTop: "1rem",
-              }}
-            >
-              <strong>Error:</strong> {error}
-            </div>
-          )}
-        </div>
+            {selectedImage && !isAnalyzed && (
+              <p
+                style={{ marginTop: "1rem", color: "#666", fontSize: "0.9rem" }}
+              >
+                File selected: <strong>{selectedImage.name}</strong>
+              </p>
+            )}
+
+            {error && (
+              <div
+                className="analysis-error-panel"
+                style={{
+                  marginTop: "1rem",
+                }}
+              >
+                <strong>Error:</strong> {error}
+              </div>
+            )}
+          </div>
 
           <div className="card-right">
             {isLoading ? (
@@ -580,20 +605,26 @@ const AnalysisPage: React.FC = () => {
                         <>
                           <p>
                             <span className="metric-label">Tumor Area:</span>
-                            <span className="metric-value" style={{ color: "#ff6b6b" }}>
-                              {predictionResult.area_stats?.cancer_percent?.toFixed(2) ?? 
-                               (predictionResult.area_stats?.tumor_area && predictionResult.area_stats?.total_area 
-                                ? ((predictionResult.area_stats.tumor_area / predictionResult.area_stats.total_area) * 100).toFixed(2) 
-                                : "N/A")}%
+                            <span
+                              className="metric-value"
+                              style={{ color: "#ff6b6b" }}
+                            >
+                              {predictionResult.area_stats?.cancer_percent?.toFixed(
+                                2,
+                              ) ?? "N/A"}
+                              %
                             </span>
                           </p>
                           <p>
                             <span className="metric-label">Normal Area:</span>
-                            <span className="metric-value" style={{ color: "#ffffff" }}>
-                              {predictionResult.area_stats?.normal_percent?.toFixed(2) ?? 
-                               (predictionResult.area_stats?.tumor_area && predictionResult.area_stats?.total_area 
-                                ? (100 - (predictionResult.area_stats.tumor_area / predictionResult.area_stats.total_area) * 100).toFixed(2) 
-                                : "N/A")}%
+                            <span
+                              className="metric-value"
+                              style={{ color: "#ffffff" }}
+                            >
+                              {predictionResult.area_stats?.normal_percent?.toFixed(
+                                2,
+                              ) ?? "N/A"}
+                              %
                             </span>
                           </p>
                         </>
@@ -601,8 +632,13 @@ const AnalysisPage: React.FC = () => {
                         <>
                           <p>
                             <span className="metric-label">Prediction:</span>
-                            <span className="metric-value" style={{ color: "#ffffff" }}>
-                              {formatPredictionLabel(predictionResult?.prediction) || "N/A"}
+                            <span
+                              className="metric-value"
+                              style={{ color: "#ffffff" }}
+                            >
+                              {formatPredictionLabel(
+                                predictionResult?.prediction,
+                              ) || "N/A"}
                             </span>
                           </p>
                           <p>
@@ -677,18 +713,18 @@ const AnalysisPage: React.FC = () => {
                   <div className="step-item">
                     <h3>2. AI Analysis</h3>
                     <p>
-                      AI performs classification to identify tissue categories and
-                      uses Grad-CAM visualization to highlight regions of interest
-                      that influenced the prediction.
+                      AI performs classification to identify tissue categories
+                      and uses Grad-CAM visualization to highlight regions of
+                      interest that influenced the prediction.
                     </p>
                   </div>
 
                   <div className="step-item">
                     <h3>3. Result</h3>
                     <p>
-                      Prediction results, Grad-CAM visualization, and AI-generated
-                      medical description are displayed to support early
-                      detection, not as a medical diagnosis.
+                      Prediction results, Grad-CAM visualization, and
+                      AI-generated medical description are displayed to support
+                      early detection, not as a medical diagnosis.
                     </p>
                   </div>
                 </div>
@@ -724,7 +760,9 @@ const AnalysisPage: React.FC = () => {
           <div className="analysis-description-card">
             <h3>
               AI Analysis Description for{" "}
-              {modelType === "classification" ? "Classification" : "Segmentation"}
+              {modelType === "classification"
+                ? "Classification"
+                : "Segmentation"}
               :
             </h3>
 
@@ -741,9 +779,7 @@ const AnalysisPage: React.FC = () => {
         )}
       </div>
 
-      <div
-        className={`chatbot-sidebar ${chatOpen ? "open" : ""}`}
-      >
+      <div className={`chatbot-sidebar ${chatOpen ? "open" : ""}`}>
         <div className="chatbot-header">
           <div>AI Consultation Chat</div>
           <button
@@ -760,7 +796,9 @@ const AnalysisPage: React.FC = () => {
           {chatMessages.length === 0 ? (
             <div className="chatbot-empty">
               Discuss the analysis results for{" "}
-              {modelType === "classification" ? "classification" : "segmentation"}{" "}
+              {modelType === "classification"
+                ? "classification"
+                : "segmentation"}{" "}
               with the AI assistant.
             </div>
           ) : (
@@ -774,8 +812,14 @@ const AnalysisPage: React.FC = () => {
                 </div>
               ))}
               {isChatLoading ? (
-                <div className="chatbot-message assistant loading" aria-live="polite">
-                  <div className="chatbot-typing" aria-label="Assistant is typing">
+                <div
+                  className="chatbot-message assistant loading"
+                  aria-live="polite"
+                >
+                  <div
+                    className="chatbot-typing"
+                    aria-label="Assistant is typing"
+                  >
                     <span />
                     <span />
                     <span />
@@ -789,7 +833,11 @@ const AnalysisPage: React.FC = () => {
         <form className="chatbot-input" onSubmit={handleSendChat}>
           <input
             type="text"
-            placeholder={isChatLoading ? "Waiting for assistant response..." : "Type your question..."}
+            placeholder={
+              isChatLoading
+                ? "Waiting for assistant response..."
+                : "Type your question..."
+            }
             value={chatInput}
             onChange={(event) => setChatInput(event.target.value)}
             disabled={isChatLoading}
