@@ -21,6 +21,7 @@ import {
   logoutUser,
   touchSessionActivity,
 } from "./utils/session";
+import { Toaster } from "sonner";
 
 function ScrollHandler() {
   const location = useLocation();
@@ -169,6 +170,7 @@ function App() {
 
   return (
     <Router>
+      <Toaster richColors position="top-right" />
       <ScrollHandler />
       <SessionManager />
       {showSplash && <SplashScreen />}

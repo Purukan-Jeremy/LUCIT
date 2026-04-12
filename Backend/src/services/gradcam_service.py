@@ -12,11 +12,10 @@ def get_last_conv_layer(model):
     raise ValueError("No Conv2D layer found in model.")
 
 
-def make_gradcam_heatmap(img_array, base_model, classifier_layers=None, last_conv_layer_name=None, pred_index=None):
+def make_gradcam_heatmap(img_array, base_model, last_conv_layer_name=None, pred_index=None):
     """
     img_array        : Input image array (1, H, W, 3)
     base_model       : Model lengkap
-    classifier_layers: List of layers yang membentuk head (optional)
     last_conv_layer_name: Nama conv layer terakhir
     pred_index       : Index kelas untuk Grad-CAM
     """
@@ -50,12 +49,6 @@ def make_gradcam_heatmap(img_array, base_model, classifier_layers=None, last_con
 
         num_classes = int(predictions.shape[-1])
 
-        if pred_index >= num_classes:
-            raise ValueError(
-                f"pred_index ({pred_index}) >= num_classes ({num_classes}). "
-                f"Model output has {num_classes} classes but trying to access index {pred_index}"
-            )
-
         if num_classes == 1:
             loss = predictions[0, 0]
         else:
@@ -64,12 +57,7 @@ def make_gradcam_heatmap(img_array, base_model, classifier_layers=None, last_con
     grads = tape.gradient(loss, conv_outputs)
     
     if grads is None:
-        raise ValueError(
-            "Gradients are None. This might happen if:\n"
-            "1. The model is not trainable\n"
-            "2. There's no connection between conv layer and output\n"
-            "3. The layer is frozen"
-        )
+        raise ValueError("Gradients are None.")
     
     pooled_grads = tf.reduce_mean(grads, axis=(0, 1, 2))
 
@@ -82,24 +70,20 @@ def make_gradcam_heatmap(img_array, base_model, classifier_layers=None, last_con
     return heatmap.numpy()
 
 
-def overlay_heatmap(original_img, heatmap, alpha=0.4, blur=True, invert=False):
+def overlay_heatmap(original_img, heatmap, alpha=0.4):
     """
-    original_img: RGB image (H,W,3)
+    original_img: BGR image (H,W,3) - OpenCV format
     heatmap     : Output dari make_gradcam_heatmap
     alpha       : Transparansi overlay
-    blur        : Apply Gaussian blur
-    invert      : Invert heatmap warna
     """
+    # Resize heatmap to match original image
+    heatmap_resized = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
     
-    heatmap = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
+    # Apply colormap
+    heatmap_uint8 = np.uint8(255 * heatmap_resized)
+    heatmap_color = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
 
-    if blur:
-        heatmap = cv2.GaussianBlur(heatmap, (25, 25), 0)
-    
-    heatmap = np.uint8(255 * heatmap)
-    
-    heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-
+    # Superimpose
     superimposed_img = cv2.addWeighted(original_img, 1 - alpha, heatmap_color, alpha, 0)
     
-    return superimposed_img
+    return superimposed_img, heatmap_color

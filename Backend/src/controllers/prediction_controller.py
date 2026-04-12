@@ -16,6 +16,7 @@ from src.services.gradcam_service import (
 )
 from src.services.ai_validator_service import (
     generate_ai_description,
+    generate_ai_description_segmentation,
     validate_histopathology,
 )
 from src.services.segmentation_service import run_segmentation
@@ -49,13 +50,6 @@ def _has_rescaling_layer(model):
 
 
 def _preprocess_image(image_array, model):
-    """
-    Preprocess mode:
-    - auto (default): if model has Rescaling layer => keep 0..255, else divide 255
-    - rescale_01: divide by 255
-    - imagenet_tf: tf-style preprocess_input (to -1..1)
-    - none: no normalization
-    """
     mode = os.getenv("PREPROCESS_MODE", "auto").strip().lower()
     x = image_array.astype(np.float32)
 
@@ -78,10 +72,6 @@ def _resolve_class_names(num_classes):
         parsed = [item.strip() for item in raw.split(",") if item.strip()]
         if len(parsed) == num_classes:
             return parsed
-        print(
-            f"Ignoring CLASS_NAMES env because length mismatch: "
-            f"{len(parsed)} != {num_classes}"
-        )
 
     if num_classes == len(DEFAULT_CLASS_NAMES):
         return DEFAULT_CLASS_NAMES
@@ -128,91 +118,49 @@ def _run_classification(contents: bytes, image: Image.Image) -> dict:
         for i in top_indices
     ]
 
-    print(f"Predicted class: {predicted_class} | Confidence: {confidence:.4f}")
-
     min_confidence = float(os.getenv("MIN_CONFIDENCE", "0.35"))
     low_confidence_warning = None
 
     if confidence < min_confidence:
-        print(
-            f"Low confidence detected: {confidence:.4f} < {min_confidence:.2f}. "
-            "Returning result with warning instead of hard reject."
-        )
         low_confidence_warning = (
-            "Confidence model rendah untuk klasifikasi paru/usus besar. "
-            "Silakan verifikasi manual dengan ahli patologi."
+            "Confidence model rendah. Verifikasi manual diperlukan."
         )
 
-    # ── Grad-CAM ────────────────────────────────────────
-    print("Generating Grad-CAM heatmap...")
+    # Grad-CAM
     try:
         last_conv_layer_name = get_last_conv_layer(model)
+        heatmap = make_gradcam_heatmap(img_array, model, last_conv_layer_name, predicted_class_index)
+        
+        # Convert PIL image (RGB) to BGR for OpenCV functions
+        original_img_bgr = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        
+        # Generate overlay and colorized heatmap
+        gradcam_image_bgr, heatmap_color_bgr = overlay_heatmap(original_img_bgr, heatmap)
 
-        heatmap = make_gradcam_heatmap(
-            img_array,
-            base_model=model,
-            last_conv_layer_name=last_conv_layer_name,
-            pred_index=predicted_class_index
-        )
-
-        original_img = np.array(image)
-        heatmap_resized = cv2.resize(heatmap, (original_img.shape[1], original_img.shape[0]))
-        heatmap_blurred = cv2.GaussianBlur(heatmap_resized, (25, 25), 0)
-        heatmap_uint8 = np.uint8(255 * heatmap_blurred)
-        heatmap_color = cv2.applyColorMap(heatmap_uint8, cv2.COLORMAP_JET)
-
-        gradcam_image = overlay_heatmap(original_img, heatmap)
-
-        _, heatmap_buffer = cv2.imencode(".jpg", heatmap_color)
+        # Encode colorized heatmap
+        _, heatmap_buffer = cv2.imencode(".jpg", heatmap_color_bgr)
         heatmap_base64 = base64.b64encode(heatmap_buffer).decode("utf-8")
 
-        _, buffer = cv2.imencode(".jpg", gradcam_image)
+        # Encode overlay image
+        _, buffer = cv2.imencode(".jpg", gradcam_image_bgr)
         gradcam_base64 = base64.b64encode(buffer).decode("utf-8")
-
-        print("Grad-CAM generated successfully")
-
+        
+        print("[Predict] Grad-CAM generated successfully")
     except Exception as e:
-        print(f"Grad-CAM error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-
-        original_img = np.array(image)
-        _, buffer = cv2.imencode(".jpg", original_img)
+        print(f"[Predict] Grad-CAM failed: {str(e)}")
+        # Fallback to original image if Grad-CAM fails
+        _, buffer = cv2.imencode(".jpg", cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
         gradcam_base64 = base64.b64encode(buffer).decode("utf-8")
         heatmap_base64 = None
 
-    # ── AI Description ───────────────────────────────────
-    print("Generating AI description...")
-    ai_description_future = _gradcam_executor.submit(
+    # AI Description
+    ai_description = _gradcam_executor.submit(
         generate_ai_description,
         image_bytes=contents,
         prediction=predicted_class,
         confidence=confidence,
         gradcam_base64=gradcam_base64,
-    )
-    
-    ai_description = ai_description_future.result()
-
-    if not isinstance(ai_description, str) or not ai_description.strip():
-        risk_phrase = (
-            "higher-risk malignant pattern"
-            if any(token in predicted_class.lower() for token in ["aca", "scc", "malignant"])
-            else "lower-risk benign pattern"
-            if "benign" in predicted_class.lower()
-            else "non-specific pattern"
-        )
-
-        ai_description = (
-            f"Based on the model output, this sample is classified as {predicted_class} "
-            f"with an estimated confidence of {confidence * 100:.2f}%. The visual features "
-            f"identified by the network are more consistent with a {risk_phrase} than with "
-            "other available classes in the same model. A high confidence score suggests that "
-            "the internal feature matching process was stable for this image, but confidence does "
-            "not represent absolute diagnostic certainty. This AI interpretation should be used "
-            "as decision-support only, not as a standalone diagnosis."
-        )
-
-    print("AI description generated")
+    ).result()
 
     return {
         "status": "success",
@@ -228,47 +176,14 @@ def _run_classification(contents: bytes, image: Image.Image) -> dict:
 
 
 def _run_segmentation(contents: bytes) -> dict:
-    print("[Segmentation] Loading segmentation model...")
     seg_model = load_segmentation_model()
-
-    print("[Segmentation] Running segmentation pipeline...")
-    seg_result = run_segmentation(
+    seg_result = run_segmentation(image_bytes=contents, seg_model=seg_model)
+    ai_description = generate_ai_description_segmentation(
         image_bytes=contents,
-        seg_model=seg_model,
+        area_stats=seg_result.get("area_stats", {}),
+        overlay_base64=seg_result.get("overlay_base64"),
     )
 
-    print("[Segmentation] Generating AI description...")
-    try:
-        area_stats = seg_result.get("area_stats", {})
-        # Use cancer_percent directly from area_stats
-        cancer_percentage = area_stats.get("cancer_percent", 0.0)
-
-        # Interpretasi level
-        if cancer_percentage > 50:
-            severity = "extensive cancer involvement"
-        elif cancer_percentage > 20:
-            severity = "moderate cancer involvement"
-        elif cancer_percentage > 5:
-            severity = "small cancer region detected"
-        else:
-            severity = "minimal or no significant cancer region"
-
-        ai_description = (
-            f"The segmentation model identified regions of interest within the histopathology image. "
-            f"Approximately {cancer_percentage:.2f}% of the tissue area is classified as cancer region, "
-            f"suggesting {severity}. The segmentation mask highlights areas that are morphologically "
-            f"different from surrounding tissue. This result is intended as a decision-support tool "
-            f"and should not be used as a standalone medical diagnosis. Expert pathology review is recommended."
-        )
-
-    except Exception as e:
-        print("[Segmentation] AI description error:", e)
-        ai_description = (
-            "The segmentation model generated a cancer mask, but additional interpretation "
-            "could not be completed. Please refer to the visual output and consult a medical expert."
-        )
-
-    print("[Segmentation] Done.")
     return {
         "status": "success",
         "model_type": "segmentation",
@@ -287,71 +202,62 @@ def _run_segmentation(contents: bytes) -> dict:
 
 class ImageController:
     @staticmethod
-    def predict_image(file, model_type="classification"):
-        """
-        Fungsi prediksi gambar histopatologi.
-        model_type: "classification" atau "segmentation"
-        """
+    def predict_image(file, user_id, model_type="classification"):
+        try:
+            contents = file.read()
+            
+            # Validation
+            print(f"[Predict] Validating image for user {user_id}...")
+            validation = validate_histopathology(contents)
+            if not validation.get("is_histopathology", False):
+                print("[Predict] Validation failed: Not histopathology")
+                return {"status": "error", "message": "Not Histopathology Image"}
 
-        contents = file.read()
+            if model_type == "classification":
+                print("[Predict] Running classification...")
+                image = Image.open(BytesIO(contents)).convert("RGB")
+                result = _run_classification(contents, image)
+            elif model_type == "segmentation":
+                print("[Predict] Running segmentation...")
+                result = _run_segmentation(contents)
+            else:
+                return {"status": "error", "message": f"Unknown model_type: {model_type}"}
 
-        print("Validating image with Gemini...")
-        validation = validate_histopathology(contents)
-        print("Validation result:", validation)
-
-        if not validation.get("is_histopathology", False):
-            return {
-                "status": "error",
-                "message": "Not Histopathology Image"
-            }
-
-        if model_type == "none":
-            return {
-                "status": "error", 
-                "message": "No model selected. Please select Classification or Segmentation."
-            }
-
-        if model_type == "classification":
-            image = Image.open(BytesIO(contents)).convert("RGB")
-            result = _run_classification(contents, image)
-        elif model_type == "segmentation":
-            result = _run_segmentation(contents)
-        else:
-            return {"status": "error", "message": f"Unknown model_type: {model_type}"}
-
-        return ResultRepository.store_analysis_result(result)
+            # Original image for storage
+            print("[Predict] Storing result in repository...")
+            original_b64 = base64.b64encode(contents).decode("utf-8")
+            return ResultRepository.store_analysis_result(user_id, result, f"data:image/jpeg;base64,{original_b64}")
+        except Exception as e:
+            print(f"[Predict] CRITICAL ERROR: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise e
 
 
 class HistoryController:
     @staticmethod
-    def get_history():
-        return {
-            "status": "success",
-            "data": ResultRepository.get_history(),
-        }
+    def get_history(user_id):
+        return ResultRepository.get_history(user_id)
 
     @staticmethod
-    def filter_history(query):
-        return {
-            "status": "success",
-            "data": ResultRepository.filter_history(query),
-        }
+    def filter_history(user_id, query):
+        return ResultRepository.filter_history(user_id, query)
+
+    @staticmethod
+    def delete_history_item(user_id, history_id):
+        success = ResultRepository.delete_history_item(user_id, history_id)
+        return {"status": "success" if success else "error"}
 
 
 # ──────────────────────────────────────────────
-# module-level wrapper functions
+# Wrapper functions
 # ──────────────────────────────────────────────
 
-def predict_image(file, model_type="classification"):
-    return ImageController.predict_image(file, model_type=model_type)
+def predict_image(file, user_id, model_type="classification"):
+    return ImageController.predict_image(file, user_id, model_type=model_type)
 
+def get_history(user_id):
+    return HistoryController.get_history(user_id)
 
-def get_history():
-    return HistoryController.get_history()
-
-
-def filter_history(query):
-    return HistoryController.filter_history(query)
-
-
-AnalysisController = ImageController
+def filter_history(user_id, query):
+    return HistoryController.filter_history(user_id, query)

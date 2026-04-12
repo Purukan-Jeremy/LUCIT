@@ -11,6 +11,7 @@ _genai_configured = False
 _description_model_cache = {}
 validation_cache = {}
 description_cache = {}
+segmentation_description_cache = {}  # Cache khusus segmentasi
 
 
 def _candidate_models():
@@ -129,6 +130,148 @@ def _build_local_description(prediction: str, confidence: float) -> str:
     )
 
 
+# ── FUNGSI BARU: Fallback lokal untuk segmentasi ──────────────────────────────
+
+def _build_local_segmentation_description(area_stats: dict) -> str:
+    """
+    Fallback description untuk segmentasi ketika Gemini tidak tersedia.
+
+    Args:
+        area_stats: Dict hasil compute_area_stats dari segmentation_service,
+                    berisi: cancer_percent, normal_percent, cancer_pixels, total_pixels
+    """
+    cancer_pct = float(area_stats.get("cancer_percent", 0.0))
+    normal_pct = float(area_stats.get("normal_percent", 100.0))
+
+    # Tentukan tingkat keterlibatan tumor
+    if cancer_pct > 50:
+        severity_text  = "keterlibatan tumor yang ekstensif"
+        risk_text      = "tinggi"
+        recommendation = (
+            "Temuan ini sangat disarankan untuk segera ditindaklanjuti dengan "
+            "pemeriksaan patologi lengkap dan konsultasi dokter spesialis."
+        )
+    elif cancer_pct > 20:
+        severity_text  = "keterlibatan tumor yang moderat"
+        risk_text      = "sedang hingga tinggi"
+        recommendation = (
+            "Hasil ini perlu dikonfirmasi dengan pemeriksaan histopatologi "
+            "lanjutan oleh dokter spesialis."
+        )
+    elif cancer_pct > 5:
+        severity_text  = "area tumor yang kecil namun terdeteksi"
+        risk_text      = "rendah hingga sedang"
+        recommendation = (
+            "Pemantauan berkala dan evaluasi klinis lanjutan direkomendasikan "
+            "untuk memastikan temuan ini."
+        )
+    else:
+        severity_text  = "area tumor yang minimal atau tidak signifikan"
+        risk_text      = "rendah"
+        recommendation = (
+            "Hasil ini tetap perlu dikonfirmasi melalui evaluasi klinis dan "
+            "pemeriksaan patologi oleh dokter spesialis."
+        )
+
+    return (
+        f"Berdasarkan hasil segmentasi model, ditemukan {severity_text} pada citra histopatologi yang dianalisis. "
+        f"Sekitar {cancer_pct:.2f}% dari total area jaringan teridentifikasi sebagai area yang berpotensi "
+        f"mengandung sel tumor, sementara {normal_pct:.2f}% sisanya merupakan jaringan yang tidak ditandai "
+        f"dengan warna merah pada overlay. Pola distribusi spasial area tumor pada citra ini menunjukkan "
+        f"kecenderungan risiko yang {risk_text} berdasarkan proporsi area yang terdeteksi. Segmentasi dilakukan "
+        f"menggunakan model deep learning berbasis U-Net yang mengidentifikasi batas morfologis antara jaringan "
+        f"normal dan abnormal secara otomatis. Perlu dipahami bahwa hasil segmentasi dipengaruhi oleh kualitas "
+        f"preparat, variasi pewarnaan H&E, artefak gambar, serta threshold yang digunakan dalam proses binarisasi mask. "
+        f"Visualisasi overlay merah pada gambar menunjukkan lokasi spesifik area yang diidentifikasi sebagai "
+        f"region of interest oleh model, yang dapat membantu ahli patologi dalam menelaah area prioritas. "
+        f"Hasil segmentasi ini bersifat pendukung keputusan klinis dan tidak menggantikan diagnosis medis final. "
+        f"{recommendation} Sebagai langkah lanjutan, disarankan untuk melakukan review slide oleh ahli patologi "
+        f"dan korelasi dengan data klinis pasien serta pemeriksaan penunjang lain yang relevan."
+    )
+
+
+# ── FUNGSI BARU: Generate AI description untuk segmentasi ─────────────────────
+
+def generate_ai_description_segmentation(
+    image_bytes: bytes,
+    area_stats: dict,
+    overlay_base64: str = None,
+) -> str:
+    """
+    Generate AI description untuk hasil segmentasi menggunakan Gemini API.
+
+    Args:
+        image_bytes   : Raw bytes gambar histopatologi asli (bukan overlay)
+        area_stats    : Dict dari compute_area_stats:
+                        { cancer_percent, normal_percent, cancer_pixels, total_pixels }
+        overlay_base64: Optional — base64 JPEG gambar overlay merah hasil segmentasi
+
+    Returns:
+        AI-generated description dalam Bahasa Indonesia
+    """
+    if not GEMINI_API_KEY:
+        print("Warning: GEMINI_API_KEY not configured, using local segmentation description.")
+        return _build_local_segmentation_description(area_stats)
+
+    # ── Cache: key berdasarkan hash gambar + area_stats ───────────────────────
+    image_hash = hashlib.md5(image_bytes).hexdigest()
+    stats_hash = hashlib.md5(json.dumps(area_stats, sort_keys=True).encode()).hexdigest()
+    cache_key  = f"seg:{image_hash}:{stats_hash}"
+
+    if cache_key in segmentation_description_cache:
+        print("Using cached AI segmentation description.")
+        return segmentation_description_cache[cache_key]
+
+    # ── Siapkan data area_stats untuk prompt ──────────────────────────────────
+    cancer_pct  = float(area_stats.get("cancer_percent", 0.0))
+    normal_pct  = float(area_stats.get("normal_percent", 100.0))
+
+    try:
+        # Gunakan overlay jika tersedia, fallback ke gambar asli
+        if overlay_base64:
+            image_base64 = overlay_base64
+        else:
+            image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
+
+        prompt = f"""Anda adalah asisten AI medis yang ahli dalam analisis histopatologi dan segmentasi tumor.
+
+Saya telah melakukan segmentasi otomatis pada gambar histopatologi menggunakan model U-Net dengan hasil berikut:
+- Area terdeteksi sebagai tumor : {cancer_pct:.2f}%
+- Area terdeteksi sebagai normal: {normal_pct:.2f}%
+- Pada gambar overlay, area berwarna merah menunjukkan region yang diidentifikasi sebagai tumor oleh model, sedangkan area yang tidak ditandai warna merah merupakan jaringan normal.
+
+Tolong analisis gambar histopatologi ini (dengan overlay segmentasi) dan berikan deskripsi medis yang detail dalam Bahasa Indonesia. \
+Sertakan interpretasi distribusi spasial area tumor, karakteristik morfologi yang terlihat, serta tingkat keterlibatan jaringan. \
+Jangan menyebutkan jumlah piksel, neoplastik, biopsi, reseksi, prognosis, stadium tumor, metastasis, kekambuhan pasca-terapi, \
+maupun rencana strategi terapi. \
+Jawab HANYA dalam Bahasa Indonesia, dalam paragraf yang mengalir, tanpa numbering atau bullets. Panjang total: sekitar 12-15 kalimat."""
+
+        response, used_model = _generate_with_fallback(prompt, image_base64)
+
+        description = (response.text or "").strip()
+        description = description.replace("**", "").replace("*", "").strip()
+
+        if not description:
+            print(
+                f"Gemini returned empty segmentation description using model: {used_model}. "
+                "Falling back to local segmentation description."
+            )
+            return _build_local_segmentation_description(area_stats)
+
+        print(
+            f"AI Segmentation Description generated successfully ({len(description)} characters) "
+            f"using model: {used_model}"
+        )
+        segmentation_description_cache[cache_key] = description
+        return description
+
+    except Exception as e:
+        print(f"Error generating AI segmentation description: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return _build_local_segmentation_description(area_stats)
+
+
 def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
     """
     Lightweight fallback check for H&E-like histopathology color characteristics.
@@ -136,23 +279,18 @@ def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
     """
     try:
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        # Downsample for speed/stability.
         image = image.resize((256, 256))
         hsv = np.array(image.convert("HSV"), dtype=np.uint8)
-        h = hsv[..., 0]  # 0..255
+        h = hsv[..., 0]
         s = hsv[..., 1]
         v = hsv[..., 2]
 
-        # H&E-like stain mask:
-        # Pink/magenta near high hue end plus purple region, with enough saturation/brightness.
         pink_magenta = (h >= 200) | (h <= 15)
         purple = (h >= 165) & (h < 200)
         stain_mask = (pink_magenta | purple) & (s > 35) & (v > 35)
-
-        # Tissue coverage to avoid mostly flat/non-tissue images.
         tissue_mask = (s > 22) & (v > 25)
 
-        stain_ratio = float(np.mean(stain_mask))
+        stain_ratio  = float(np.mean(stain_mask))
         tissue_ratio = float(np.mean(tissue_mask))
 
         is_histopathology = bool(stain_ratio >= 0.16 and tissue_ratio >= 0.22)
@@ -171,6 +309,7 @@ def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
             "organ": "unknown",
             "validation_status": "heuristic_failed",
         }
+
 
 def validate_histopathology(image_bytes):
     image_hash = hashlib.md5(image_bytes).hexdigest()
@@ -195,20 +334,24 @@ def validate_histopathology(image_bytes):
         response, used_model = _generate_with_fallback(prompt, image_base64)
 
         text = response.text.strip()
-        text = text.replace("```json", "").replace("```", "").strip()
+        # Robust JSON extraction
+        import re
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            text = match.group(0)
+        else:
+            text = text.replace("```json", "").replace("```", "").strip()
 
         result = json.loads(text)
         result["is_histopathology"] = bool(result.get("is_histopathology", False))
-        result["organ"] = str(result.get("organ", "unknown")).lower()
+        result["organ"]             = str(result.get("organ", "unknown")).lower()
         result["validation_status"] = "ok"
         print(f"Validation generated using Gemini model: {used_model}")
 
         validation_cache[image_hash] = result
-
         return result
 
     except Exception as e:
-
         print("Gemini validation failed:", e)
         fallback_result = _heuristic_histopathology_check(image_bytes)
         print(f"Heuristic validation result: {fallback_result}")
@@ -234,7 +377,7 @@ def generate_ai_description(image_bytes, prediction: str, confidence: float, gra
         return "AI description unavailable: API key not configured"
 
     image_hash = hashlib.md5(image_bytes).hexdigest()
-    cache_key = f"{image_hash}:{prediction}:{confidence:.6f}"
+    cache_key  = f"{image_hash}:{prediction}:{confidence:.6f}"
     if cache_key in description_cache:
         print("Using cached AI description")
         return description_cache[cache_key]
@@ -273,6 +416,4 @@ Tolong analisis gambar histopatologi ini dan berikan deskripsi medis yang detail
         print(f"Error generating AI description: {str(e)}")
         import traceback
         traceback.print_exc()
-
-        # Always return a useful description even if Gemini is unavailable.
         return _build_local_description(prediction=prediction, confidence=confidence)
