@@ -18,9 +18,12 @@ def _candidate_models():
     preferred = (GEMINI_DESCRIPTION_MODEL or "").strip()
     models = [
         preferred,
+        "gemini-2.5-flash"
         "gemini-2.0-flash",
         "gemini-1.5-flash",
         "gemini-1.5-pro",
+        "gemini-1.5-flash-latest",
+        "gemini-pro",
     ]
     return [m for i, m in enumerate(models) if m and m not in models[:i]]
 

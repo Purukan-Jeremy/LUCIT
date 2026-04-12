@@ -8,8 +8,7 @@ def _chat_candidate_models():
     preferred = (GEMINI_CHAT_MODEL or "").strip()
     models = [
         preferred,
-        "gemini-2.0-flash",
-        "gemini-1.5-flash",
+        "gemini-2.5-flash"
     ]
     return [m for i, m in enumerate(models) if m and m not in models[:i]]
 
@@ -142,16 +141,41 @@ Jawab dalam 1-3 paragraf singkat, relevan dengan hasil analisis di atas."""
         last_error = None
         for model_name in _chat_candidate_models():
             try:
+                print(f"[Chatbot] Attempting with model: {model_name}")
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
-                text = (response.text or "").strip().replace("**", "").replace("*", "")
+
+                # Robust response checking for newer google-generativeai versions
+                if not response.candidates:
+                    print(f"[Chatbot] Model '{model_name}' returned no candidates. Check safety filters or API quota.")
+                    continue
+
+                try:
+                    text = response.text
+                except (AttributeError, ValueError) as e:
+                    # Occurs if safety filters blocked the entire response
+                    print(f"[Chatbot] Could not extract text from '{model_name}': {e}")
+                    if response.candidates:
+                        # Try to get whatever text is available
+                        candidate = response.candidates[0]
+                        parts = getattr(candidate.content, "parts", [])
+                        text = "".join([getattr(p, "text", "") for p in parts])
+                    else:
+                        text = ""
+
+                text = (text or "").strip().replace("**", "").replace("*", "")
                 if text:
+                    print(f"[Chatbot] Success using model: {model_name}")
                     return text
+                else:
+                    print(f"[Chatbot] Model '{model_name}' returned empty text.")
             except Exception as e:
                 last_error = e
-                print(f"Chat model '{model_name}' failed: {e}")
+                print(f"[Chatbot] Model '{model_name}' failed: {str(e)}")
+                import traceback
+                traceback.print_exc()
 
-        print(f"All chat model candidates failed: {last_error}")
+        print(f"[Chatbot] All chat model candidates failed. Last error: {last_error}")
         return "Chatbot sedang tidak tersedia untuk sementara. Silakan coba lagi dalam beberapa saat."
 
 
