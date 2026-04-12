@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { toast } from "sonner";
 import "../../assets/style.css";
 import { storeAuthenticatedUser } from "../../utils/session";
 
@@ -31,14 +32,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
     password: "",
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       setIsSignUp(false);
       setShowPassword(false);
       setFormData({ fullName: "", email: "", password: "" });
-      setMessage(null);
     }
   }, [isOpen]);
 
@@ -50,7 +49,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    setMessage(null);
 
     if (isSignUp) {
       try {
@@ -64,16 +62,13 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           }),
         });
 
-        console.log("Registration response status:", response.status);
         const result = await parseApiBody(response);
-        console.log("Registration response body:", result);
 
         if (response.ok) {
-          setMessage({ type: "success", text: "Account created successfully! You can now login." });
+          toast.success("Account created successfully! You can now login.");
           setIsSignUp(false);
           setFormData({ fullName: "", email: "", password: "" });
         } else {
-          // If response is not ok (e.g., 409 Conflict), throw the specific error message from the backend
           const errorMsg = result.error || "Failed to sign up";
           throw new Error(errorMsg);
         }
@@ -84,16 +79,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             : err instanceof Error
               ? err.message
               : "Something went wrong";
-        setMessage({ type: "error", text });
+        toast.error(text);
       } finally {
         setIsLoading(false);
       }
     } else {
-      // Logic for Login
       try {
         const response = await fetch(`${API_BASE_URL}/api/login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             email: formData.email,
             password: formData.password,
@@ -107,19 +102,11 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             email: result.user.email,
           };
           
-          // Provide positive feedback
-          setMessage({ 
-            type: "success", 
-            text: `Welcome back, ${userData.fullname}! Signing you in...` 
-          });
+          toast.success(`Welcome back, ${userData.fullname}!`);
 
           storeAuthenticatedUser(userData);
           onLoginSuccess(userData);
-          
-          // Brief delay to allow the user to read the success message
-          setTimeout(() => {
-            onClose();
-          }, 1200);
+          onClose();
         } else {
           throw new Error(result.message || "Invalid credentials");
         }
@@ -130,7 +117,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             : err instanceof Error
               ? err.message
               : "Invalid email or password";
-        setMessage({ type: "error", text });
+        toast.error(text);
       } finally {
         setIsLoading(false);
       }
@@ -150,12 +137,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
         <p className="modal-subtitle">
           {isSignUp ? "Fill in the details to get started" : "Enter your email and password to continue"}
         </p>
-
-        {message && (
-          <div className={`modal-message ${message.type}`}>
-            {message.text}
-          </div>
-        )}
 
         <div className="login-options">
           <form className="manual-login-form" onSubmit={handleSubmit}>

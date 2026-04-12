@@ -63,7 +63,7 @@ SEGMENTATION_CUSTOM_OBJECTS = {
 # Model loader
 # ══════════════════════════════════════════════════════════════
 
-def load_model(model_name="mobilenetv2.keras"):
+def load_model(model_name="efficientnetB3_Adamax.keras"):
     """
     Load model Keras dan cache supaya tidak load berulang.
     Untuk model segmentasi, gunakan load_segmentation_model().

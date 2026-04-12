@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import "../../assets/style.css";
 import { hasActiveSession } from "../../utils/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
-const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
 type ChatMessage = { role: "user" | "assistant"; text: string };
 
 function formatPredictionLabel(prediction?: string) {
@@ -55,7 +55,6 @@ const AnalysisPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
-  const [notice, setNotice] = useState<{ type: "info" | "error"; text: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -109,44 +108,26 @@ const AnalysisPage: React.FC = () => {
     }
   }, [modelType]);
 
-  const showNotice = (type: "info" | "error", text: string) => {
-    setNotice({ type, text });
-    setTimeout(() => setNotice(null), 3500);
-  };
-
-  const saveAnalysisToHistory = (data: any) => {
-    if (!data) return;
-    const isSegmentation = data.model_type === "segmentation";
-    const cancerPercent = data.area_stats?.cancer_percent ?? "N/A";
-    const confidenceValue = isSegmentation ? `Cancer: ${cancerPercent}%` : `${(data.confidence * 100).toFixed(2)}%`;
-    const entry = {
-      id: Date.now(),
-      prediction: isSegmentation ? `Segmentation: ${cancerPercent}% Cancer` : formatPredictionLabel(data.prediction),
-      confidence: confidenceValue,
-      createdAt: new Date().toISOString(),
-      model: isSegmentation ? "Segmentation" : "Classification",
-      description: data.ai_description || "No description.",
-      originalImage: selectedPreview,
-      heatmapImage: data.gradcam_heatmap ? `data:image/jpeg;base64,${data.gradcam_heatmap}` : (data.segmentation_mask ? `data:image/png;base64,${data.segmentation_mask}` : ""),
-      overlayImage: data.gradcam_image ? `data:image/jpeg;base64,${data.gradcam_image}` : (data.overlay_image ? `data:image/jpeg;base64,${data.overlay_image}` : ""),
-    };
-    try {
-      const raw = localStorage.getItem(ANALYSIS_HISTORY_KEY);
-      const prev = raw ? JSON.parse(raw) : [];
-      localStorage.setItem(ANALYSIS_HISTORY_KEY, JSON.stringify([entry, ...prev].slice(0, 50)));
-    } catch (e) { console.error(e); }
-  };
-
   const sendImageToBackend = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("model_type", modelType);
     try {
       setIsLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/predict`, { method: "POST", body: formData });
+      const res = await fetch(`${API_BASE_URL}/api/predict`, { 
+        method: "POST", 
+        body: formData,
+        credentials: "include"
+      });
+      
       const data = await res.json();
-      if (!res.ok || data.status === "error") throw new Error(data.message || "Failed");
+      
+      if (!res.ok || data.status === "error") {
+        throw new Error(data.message || data.error || "Analysis failed");
+      }
+
       setPredictionResult(data);
+      
       if (data.model_type === "segmentation") {
         setHeatmapPreview(data.mask_image ? `data:image/png;base64,${data.mask_image}` : `data:image/png;base64,${data.segmentation_mask}`);
         setOverlayPreview(data.overlay_image ? `data:image/jpeg;base64,${data.overlay_image}` : `data:image/jpeg;base64,${data.gradcam_image}`);
@@ -154,26 +135,30 @@ const AnalysisPage: React.FC = () => {
         setHeatmapPreview(data.gradcam_heatmap ? `data:image/jpeg;base64,${data.gradcam_heatmap}` : "");
         setOverlayPreview(data.gradcam_image ? `data:image/jpeg;base64,${data.gradcam_image}` : "");
       }
-      saveAnalysisToHistory(data);
+      
       setIsAnalyzed(true);
+      toast.success("Analysis completed and saved to history.");
     } catch (err: any) {
+      console.error("Analysis Error:", err);
       setError(err.message);
-      showNotice("error", err.message);
-    } finally { setIsLoading(false); }
+      toast.error(err.message);
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   const handleStartAnalysis = async () => {
     if (!hasActiveSession()) {
-      showNotice("info", "Sign in required.");
+      toast.error("Sign in required.");
       window.dispatchEvent(new Event("lucit:open-login"));
       return;
     }
     if (modelType === "none") {
-      showNotice("info", "Please select a model first.");
+      toast.error("Please select a model first.");
       return;
     }
     if (!selectedImage) {
-      showNotice("info", "Please upload a histopathology image.");
+      toast.error("Please upload a histopathology image.");
       return;
     }
     await sendImageToBackend(selectedImage);
@@ -191,6 +176,7 @@ const AnalysisPage: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           message: msg,
           analysis_context: {
@@ -220,7 +206,7 @@ const AnalysisPage: React.FC = () => {
 
   const handleUploadClick = () => {
     if (modelType === "none") {
-      showNotice("info", "Please select a model first.");
+      toast.error("Please select a model first.");
       return;
     }
     fileInputRef.current?.click();
@@ -349,12 +335,6 @@ const AnalysisPage: React.FC = () => {
             {isLoading ? "PROCESSING" : isAnalyzed ? "COMPLETED" : "IDLE"}
           </div>
         </header>
-
-        {notice && (
-          <div className={`notice notice-top ${notice.type}`} style={{ position: 'relative', top: 0, marginBottom: '1rem' }}>
-            <span>{notice.text}</span>
-          </div>
-        )}
 
         {isLoading ? (
           <div className="analysis-loading-container">
