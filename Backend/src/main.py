@@ -10,15 +10,15 @@ from src.routes.prediction_routes import prediction_bp
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
-# Register Blueprints
+
 app.config["SECRET_KEY"] = FLASK_SECRET_KEY
 
-# API Routes registration
+
 app.register_blueprint(user_bp)
 app.register_blueprint(chatbot_bp)
 app.register_blueprint(prediction_bp, url_prefix="/api")
 
-# Preload model on startup
+
 try:
     load_model()
 except Exception as preload_error:

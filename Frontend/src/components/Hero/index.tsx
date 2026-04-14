@@ -1,31 +1,26 @@
 import { useNavigate } from "react-router-dom";
 import "../../assets/style.css";
 import { hasActiveSession } from "../../utils/session";
-// Pastikan CSS Hero sudah terhubung (biasanya via global style.css)
-
-type DocumentWithViewTransition = Document & {
-  startViewTransition?: (updateCallback: () => void) => void;
-};
+import React from "react";
 
 function Hero() {
   const navigate = useNavigate();
 
-  const handleStartDetection = () => {
+  const handleStartDetection = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!hasActiveSession()) {
       window.dispatchEvent(new Event("lucit:open-login"));
       return;
     }
 
-    const docWithTransition = document as DocumentWithViewTransition;
+    // Get button position for the transition mask
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
 
-    if (docWithTransition.startViewTransition) {
-      docWithTransition.startViewTransition(() => {
-        navigate("/analysis");
-      });
-      return;
-    }
-
-    navigate("/analysis");
+    // Trigger global transition event
+    window.dispatchEvent(new CustomEvent("lucit:start-transition", {
+      detail: { x, y, target: "/analysis" }
+    }));
   };
 
   return (
@@ -41,7 +36,6 @@ function Hero() {
           Histopathology Classification and Segmentation
         </p>
 
-        {/* Tambahkan event onClick di sini */}
         <button className="primary-btn" onClick={handleStartDetection}>
           Start Detection
         </button>

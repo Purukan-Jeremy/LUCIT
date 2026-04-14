@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from src.config.settings import GEMINI_API_KEY, GEMINI_CHAT_MODEL
 
-OUT_OF_SCOPE_REPLY = "Maaf, saya hanya menjawab terkait dengan hasil analisis."
+OUT_OF_SCOPE_REPLY = "I'm sorry, but I can only answer questions related to the analysis results."
 
 
 def _chat_candidate_models():
@@ -24,15 +24,15 @@ def _has_analysis_context(analysis_context: dict) -> bool:
 def _is_analysis_related(message: str, analysis_context: dict, chat_history: list | None = None) -> bool:
     text = (message or "").lower()
     strong_analysis_keywords = [
-        "analisis",
-        "hasil",
-        "prediksi",
+        "analysis",
+        "result",
+        "prediction",
         "confidence",
-        "akurasi",
+        "accuracy",
         "heatmap",
         "overlay",
-        "histopatologi",
-        "jaringan",
+        "histopathology",
+        "tissue",
         "cancer",
         "kanker",
         "lung",
@@ -40,12 +40,12 @@ def _is_analysis_related(message: str, analysis_context: dict, chat_history: lis
         "benign",
         "aca",
         "scc",
-        "deskripsi",
+        "description",
         "model",
-        "gambar",
-        "penyakit",
+        "image",
+        "disease",
         "diagnosis",
-        "stadium",
+        "stage",
     ]
     if any(keyword in text for keyword in strong_analysis_keywords):
         return True
@@ -53,23 +53,23 @@ def _is_analysis_related(message: str, analysis_context: dict, chat_history: lis
     has_context = _has_analysis_context(analysis_context) or bool(chat_history)
     if has_context:
         off_topic_keywords = [
-            "cuaca",
-            "lagu",
-            "musik",
-            "film",
-            "bola",
+            "weather",
+            "song",
+            "music",
+            "movie",
+            "sports",
             "game",
-            "politik",
-            "kode",
+            "politics",
+            "code",
             "programming",
-            "resep",
-            "masak",
+            "recipe",
+            "cooking",
         ]
         if any(keyword in text for keyword in off_topic_keywords):
             return False
 
         # Support short follow-up questions that refer to previous analysis context.
-        follow_up_tokens = ["apa", "ini", "itu", "tersebut", "kenapa", "bagaimana", "jelaskan"]
+        follow_up_tokens = ["what", "this", "that", "why", "how", "explain"]
         if any(token in text for token in follow_up_tokens):
             return True
 
@@ -86,7 +86,7 @@ class LLMService:
             return OUT_OF_SCOPE_REPLY
 
         if not GEMINI_API_KEY:
-            return "Chatbot tidak tersedia karena GEMINI_API_KEY belum dikonfigurasi."
+            return "Chatbot is unavailable because GEMINI_API_KEY is not configured."
 
         genai.configure(api_key=GEMINI_API_KEY)
 
@@ -111,32 +111,32 @@ class LLMService:
         history_text = (
             "\n".join(history_lines)
             if history_lines
-            else "Belum ada percakapan sebelumnya."
+            else "No previous conversation."
         )
 
-        prompt = f"""Anda adalah asisten AI untuk aplikasi analisis histopatologi.
+        prompt = f"""You are an AI assistant for a histopathology analysis application.
 
-Tugas Anda:
-- Menjawab pertanyaan user berdasarkan hasil analisis yang tersedia.
-- Fokus pada interpretasi hasil model, confidence, dan deskripsi AI yang sudah dihasilkan.
-- Gunakan Bahasa Indonesia yang jelas dan ringkas.
-- Jangan mengklaim diagnosis pasti. Jelaskan bahwa hasil ini bersifat pendukung, bukan diagnosis medis final.
-- Jika pertanyaan di luar konteks hasil analisis, jawab persis dengan kalimat ini dan jangan tambahkan apa pun lagi:
+Your Tasks:
+- Answer user questions based on the available analysis results.
+- Focus on interpreting the model results, confidence, and the AI description already generated.
+- Use clear and concise English.
+- Do not claim a definitive diagnosis. Explain that these results are supportive and not a final medical diagnosis.
+- If the question is outside the context of the analysis results, answer exactly with this sentence and do not add anything else:
 {OUT_OF_SCOPE_REPLY}
 
-Konteks analisis:
-- Tipe model: {model_type}
-- Prediksi: {prediction}
+Analysis Context:
+- Model type: {model_type}
+- Prediction: {prediction}
 - Confidence: {confidence_text}
-- Deskripsi AI: {ai_description or "Tidak ada deskripsi tambahan."}
+- AI Description: {ai_description or "No additional description available."}
 
-Riwayat percakapan:
+Conversation History:
 {history_text}
 
-Pertanyaan user:
+User Question:
 {message}
 
-Jawab dalam 1-3 paragraf singkat, relevan dengan hasil analisis di atas."""
+Answer in 1-3 short paragraphs, relevant to the analysis results above."""
 
         last_error = None
         for model_name in _chat_candidate_models():
@@ -145,18 +145,15 @@ Jawab dalam 1-3 paragraf singkat, relevan dengan hasil analisis di atas."""
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(prompt)
 
-                # Robust response checking for newer google-generativeai versions
                 if not response.candidates:
-                    print(f"[Chatbot] Model '{model_name}' returned no candidates. Check safety filters or API quota.")
+                    print(f"[Chatbot] Model '{model_name}' returned no candidates.")
                     continue
 
                 try:
                     text = response.text
                 except (AttributeError, ValueError) as e:
-                    # Occurs if safety filters blocked the entire response
                     print(f"[Chatbot] Could not extract text from '{model_name}': {e}")
                     if response.candidates:
-                        # Try to get whatever text is available
                         candidate = response.candidates[0]
                         parts = getattr(candidate.content, "parts", [])
                         text = "".join([getattr(p, "text", "") for p in parts])
@@ -172,11 +169,9 @@ Jawab dalam 1-3 paragraf singkat, relevan dengan hasil analisis di atas."""
             except Exception as e:
                 last_error = e
                 print(f"[Chatbot] Model '{model_name}' failed: {str(e)}")
-                import traceback
-                traceback.print_exc()
 
         print(f"[Chatbot] All chat model candidates failed. Last error: {last_error}")
-        return "Chatbot sedang tidak tersedia untuk sementara. Silakan coba lagi dalam beberapa saat."
+        return "Chatbot is temporarily unavailable. Please try again in a few moments."
 
 
 def generate_chat_response(message: str, analysis_context: dict, chat_history: list | None = None) -> str:

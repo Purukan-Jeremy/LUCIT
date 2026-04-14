@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import "../../assets/style.css";
 import { readStoredUser } from "../../utils/session";
 
@@ -81,6 +82,97 @@ const DonutChart = ({ percent, label, color }: { percent: number, label: string,
         </text>
       </svg>
       <span className="history-donut-label">{label}</span>
+    </div>
+  );
+};
+
+// --- NEW COMPONENT: MEDICAL PULSE LOADER ---
+const ClinicalPulseLoader = () => {
+  return (
+    <div className="clinical-loader-container">
+      <div className="pulse-wrapper">
+        <div className="pulse-ring ring-1"></div>
+        <div className="pulse-ring ring-2"></div>
+        <div className="pulse-ring ring-3"></div>
+        <div className="pulse-center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M2 12h3l2 8 4-16 4 16 2-8h3"/>
+          </svg>
+        </div>
+      </div>
+      <div className="loader-text-group">
+        <h3 className="scanning-text">Scanning Diagnostic Archive</h3>
+        <p className="loading-subtext">Retrieving clinical records from secure storage...</p>
+      </div>
+
+      <style>{`
+        .clinical-loader-container {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          padding: 80px 20px;
+          min-height: 400px;
+        }
+        .pulse-wrapper {
+          position: relative;
+          width: 100px;
+          height: 100px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 30px;
+        }
+        .pulse-center {
+          width: 60px;
+          height: 60px;
+          background: #6a1b9a;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 5;
+          box-shadow: 0 4px 15px rgba(106, 27, 154, 0.4);
+        }
+        .pulse-ring {
+          position: absolute;
+          width: 60px;
+          height: 60px;
+          border: 2px solid #f06292;
+          border-radius: 50%;
+          opacity: 0;
+          animation: clinicalPulse 2.4s cubic-bezier(0.2, 0, 0.2, 1) infinite;
+        }
+        .ring-2 { animation-delay: 0.8s; }
+        .ring-3 { animation-delay: 1.6s; }
+        
+        @keyframes clinicalPulse {
+          0% { transform: scale(1); opacity: 0; }
+          10% { opacity: 0.6; }
+          100% { transform: scale(3.5); opacity: 0; }
+        }
+
+        .loader-text-group {
+          text-align: center;
+        }
+        .scanning-text {
+          font-size: 1.4rem;
+          color: #6a1b9a;
+          margin-bottom: 8px;
+          letter-spacing: -0.01em;
+          animation: textShimmer 2s ease-in-out infinite;
+        }
+        .loading-subtext {
+          color: #666;
+          font-size: 0.95rem;
+          opacity: 0.8;
+        }
+
+        @keyframes textShimmer {
+          0%, 100% { opacity: 1; transform: translateY(0); }
+          50% { opacity: 0.6; transform: translateY(-2px); }
+        }
+      `}</style>
     </div>
   );
 };
@@ -224,10 +316,7 @@ function HistoryPage() {
               type="text" 
               placeholder="Filter by prediction, organ, or findings..." 
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                // Simple debounce or immediate fetch
-              }}
+              onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && fetchHistory(query)}
             />
           </div>
@@ -241,10 +330,7 @@ function HistoryPage() {
 
         <section className="history-content-v2">
           {isLoading ? (
-            <div className="history-loading-v2">
-              <div className="button-spinner"></div>
-              <p>Retrieving diagnostic records...</p>
-            </div>
+            <ClinicalPulseLoader />
           ) : error ? (
             <div className="history-error-v2">
               <div className="error-icon">!</div>
@@ -339,12 +425,6 @@ function HistoryPage() {
                             <p className="findings-text">{item.description}</p>
                             <div className="findings-footer">
                               <div className="disclaimer-badge">AI-Generated Interpretation</div>
-                              <button className="export-btn" onClick={(e) => e.stopPropagation()}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m4-5 5 5 5-5m-5 5V3"/>
-                                </svg>
-                                Export Report
-                              </button>
                             </div>
                           </div>
                         </div>
