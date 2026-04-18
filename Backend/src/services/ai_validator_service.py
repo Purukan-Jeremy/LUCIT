@@ -137,28 +137,28 @@ def _build_local_segmentation_description(area_stats: dict) -> str:
     normal_pct = float(area_stats.get("normal_percent", 100.0))
 
     if cancer_pct > 50:
-        severity_text  = "extensive tumor involvement"
+        severity_text  = "extensive cancer cells involvement"
         risk_text      = "high"
         recommendation = (
             "These findings are strongly recommended for immediate follow-up with "
             "a complete pathological examination and specialist consultation."
         )
     elif cancer_pct > 20:
-        severity_text  = "moderate tumor involvement"
+        severity_text  = "moderate cancer cells involvement"
         risk_text      = "medium to high"
         recommendation = (
             "This result should be confirmed with further histopathology "
             "examination by a specialist physician."
         )
     elif cancer_pct > 5:
-        severity_text  = "small but detected tumor area"
+        severity_text  = "small but detected cancer cells area"
         risk_text      = "low to medium"
         recommendation = (
             "Periodic monitoring and further clinical evaluation are recommended "
             "to confirm these findings."
         )
     else:
-        severity_text  = "minimal or non-significant tumor area"
+        severity_text  = "minimal or non-significant cancer cells area"
         risk_text      = "low"
         recommendation = (
             "This result still needs to be confirmed through clinical evaluation and "
@@ -168,8 +168,8 @@ def _build_local_segmentation_description(area_stats: dict) -> str:
     return (
         f"Based on the model segmentation results, {severity_text} was found in the analyzed histopathology image. "
         f"Approximately {cancer_pct:.2f}% of the total tissue area was identified as an area potentially containing "
-        f"tumor cells, while the remaining {normal_pct:.2f}% is tissue not marked with red color on the overlay. "
-        f"The spatial distribution pattern of the tumor area on this image shows a risk tendency that is {risk_text} "
+        f"cancer cells, while the remaining {normal_pct:.2f}% is tissue not marked with red color on the overlay. "
+        f"The spatial distribution pattern of the cancer area on this image shows a risk tendency that is {risk_text} "
         f"based on the proportion of the area detected. Segmentation was performed using a U-Net based deep learning model "
         f"that automatically identifies morphological boundaries between normal and abnormal tissue. It should be understood "
         f"that segmentation results are influenced by specimen quality, H&E staining variation, image artifacts, and the "
@@ -207,16 +207,16 @@ def generate_ai_description_segmentation(
         else:
             image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
 
-        prompt = f"""You are a medical AI assistant expert in histopathology analysis and tumor segmentation.
+        prompt = f"""You are a medical AI assistant expert in histopathology analysis and cancer segmentation.
 
 I have performed automatic segmentation on a histopathology image using a U-Net model with the following results:
-- Area detected as tumor : {cancer_pct:.2f}%
+- Area detected as cancer : {cancer_pct:.2f}%
 - Area detected as normal: {normal_pct:.2f}%
-- In the overlay image, the red areas indicate regions identified as tumor by the model, while areas not marked in red represent normal tissue.
+- In the overlay image, the red areas indicate regions identified as cancer by the model, while areas not marked in red represent normal tissue.
 
 Please analyze this histopathology image (with the segmentation overlay) and provide a detailed medical description in English. \
-Include interpretations of the spatial distribution of tumor areas, observed morphological characteristics, and the level of tissue involvement. \
-Do not mention pixel counts, neoplastic, biopsy, resection, prognosis, tumor stage, metastasis, post-therapy recurrence, \
+Include interpretations of the spatial distribution of cancer areas, observed morphological characteristics, and the level of tissue involvement. \
+Do not mention pixel counts, neoplastic, biopsy, resection, prognosis, cancer stage, metastasis, post-therapy recurrence, \
 or treatment strategy plans. \
 Answer ONLY in English, in a flowing paragraph without numbering or bullets. Total length: approximately 12-15 sentences."""
 
