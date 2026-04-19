@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import "../../assets/style.css";
 import { hasActiveSession } from "../../utils/session";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
 type ChatMessage = { role: "user" | "assistant"; text: string };
 
 function formatPredictionLabel(prediction?: string) {
@@ -55,9 +55,12 @@ const AnalysisPage: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string>("");
+  const [notice, setNotice] = useState<{ type: "info" | "error"; text: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const dashboardMainRef = useRef<HTMLElement | null>(null);
+  const chatMessagesRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -66,6 +69,40 @@ const AnalysisPage: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages]);
+
+  // Enable mouse wheel + touchpad scrolling on dashboard-main
+  useEffect(() => {
+    const el = dashboardMainRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const atTop = scrollTop === 0 && e.deltaY < 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight && e.deltaY > 0;
+      if (!atTop && !atBottom) {
+        e.preventDefault();
+      }
+      el.scrollTop += e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Enable mouse wheel + touchpad scrolling on chatbot messages
+  useEffect(() => {
+    const el = chatMessagesRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const atTop = scrollTop === 0 && e.deltaY < 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight && e.deltaY > 0;
+      if (!atTop && !atBottom) {
+        e.preventDefault();
+      }
+      el.scrollTop += e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [chatOpen]);
 
   const processImage = (file: File, type: string) => {
     const reader = new FileReader();
@@ -108,26 +145,44 @@ const AnalysisPage: React.FC = () => {
     }
   }, [modelType]);
 
+  const showNotice = (type: "info" | "error", text: string) => {
+    setNotice({ type, text });
+    setTimeout(() => setNotice(null), 3500);
+  };
+
+  const saveAnalysisToHistory = (data: any) => {
+    if (!data) return;
+    const isSegmentation = data.model_type === "segmentation";
+    const cancerPercent = data.area_stats?.cancer_percent ?? "N/A";
+    const confidenceValue = isSegmentation ? `Cancer: ${cancerPercent}%` : `${(data.confidence * 100).toFixed(2)}%`;
+    const entry = {
+      id: Date.now(),
+      prediction: isSegmentation ? `Segmentation: ${cancerPercent}% Cancer` : formatPredictionLabel(data.prediction),
+      confidence: confidenceValue,
+      createdAt: new Date().toISOString(),
+      model: isSegmentation ? "Segmentation" : "Classification",
+      description: data.ai_description || "No description.",
+      originalImage: selectedPreview,
+      heatmapImage: data.gradcam_heatmap ? `data:image/jpeg;base64,${data.gradcam_heatmap}` : (data.segmentation_mask ? `data:image/png;base64,${data.segmentation_mask}` : ""),
+      overlayImage: data.gradcam_image ? `data:image/jpeg;base64,${data.gradcam_image}` : (data.overlay_image ? `data:image/jpeg;base64,${data.overlay_image}` : ""),
+    };
+    try {
+      const raw = localStorage.getItem(ANALYSIS_HISTORY_KEY);
+      const prev = raw ? JSON.parse(raw) : [];
+      localStorage.setItem(ANALYSIS_HISTORY_KEY, JSON.stringify([entry, ...prev].slice(0, 50)));
+    } catch (e) { console.error(e); }
+  };
+
   const sendImageToBackend = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("model_type", modelType);
     try {
       setIsLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/predict`, { 
-        method: "POST", 
-        body: formData,
-        credentials: "include"
-      });
-      
+      const res = await fetch(`${API_BASE_URL}/api/predict`, { method: "POST", body: formData });
       const data = await res.json();
-      
-      if (!res.ok || data.status === "error") {
-        throw new Error(data.message || data.error || "Analysis failed");
-      }
-
+      if (!res.ok || data.status === "error") throw new Error(data.message || "Failed");
       setPredictionResult(data);
-      
       if (data.model_type === "segmentation") {
         setHeatmapPreview(data.mask_image ? `data:image/png;base64,${data.mask_image}` : `data:image/png;base64,${data.segmentation_mask}`);
         setOverlayPreview(data.overlay_image ? `data:image/jpeg;base64,${data.overlay_image}` : `data:image/jpeg;base64,${data.gradcam_image}`);
@@ -135,30 +190,26 @@ const AnalysisPage: React.FC = () => {
         setHeatmapPreview(data.gradcam_heatmap ? `data:image/jpeg;base64,${data.gradcam_heatmap}` : "");
         setOverlayPreview(data.gradcam_image ? `data:image/jpeg;base64,${data.gradcam_image}` : "");
       }
-      
+      saveAnalysisToHistory(data);
       setIsAnalyzed(true);
-      toast.success("Analysis completed and saved to history.");
     } catch (err: any) {
-      console.error("Analysis Error:", err);
       setError(err.message);
-      toast.error(err.message);
-    } finally { 
-      setIsLoading(false); 
-    }
+      showNotice("error", err.message);
+    } finally { setIsLoading(false); }
   };
 
   const handleStartAnalysis = async () => {
     if (!hasActiveSession()) {
-      toast.error("Sign in required.");
+      showNotice("info", "Sign in required.");
       window.dispatchEvent(new Event("lucit:open-login"));
       return;
     }
     if (modelType === "none") {
-      toast.error("Please select a model first.");
+      showNotice("info", "Please select a model first.");
       return;
     }
     if (!selectedImage) {
-      toast.error("Please upload a histopathology image.");
+      showNotice("info", "Please upload a histopathology image.");
       return;
     }
     await sendImageToBackend(selectedImage);
@@ -176,7 +227,6 @@ const AnalysisPage: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include",
         body: JSON.stringify({
           message: msg,
           analysis_context: {
@@ -206,7 +256,7 @@ const AnalysisPage: React.FC = () => {
 
   const handleUploadClick = () => {
     if (modelType === "none") {
-      toast.error("Please select a model first.");
+      showNotice("info", "Please select a model first.");
       return;
     }
     fileInputRef.current?.click();
@@ -325,16 +375,22 @@ const AnalysisPage: React.FC = () => {
         )}
       </aside>
 
-      <main className="dashboard-main" style={{ marginRight: chatOpen ? '400px' : '0', transition: 'margin-right 0.3s ease-in-out' }}>
+      <main ref={dashboardMainRef} className="dashboard-main" style={{ marginRight: chatOpen ? '400px' : '0', transition: 'margin-right 0.3s ease-in-out' }}>
         <header className="dashboard-header">
           <div>
             <h1>Analysis Workspace</h1>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>LUCIT</div>
+            <div style={{ fontSize: '0.85rem', color: '#666' }}>LUCIT Medical Imaging v1.0</div>
           </div>
           <div className={`status-badge ${isAnalyzed ? 'active' : ''}`} style={{ background: isAnalyzed ? 'rgba(0, 200, 100, 0.1)' : 'rgba(0,0,0,0.05)', color: isAnalyzed ? '#00c864' : '#666' }}>
             {isLoading ? "PROCESSING" : isAnalyzed ? "COMPLETED" : "IDLE"}
           </div>
         </header>
+
+        {notice && (
+          <div className={`notice notice-top ${notice.type}`} style={{ position: 'relative', top: 0, marginBottom: '1rem' }}>
+            <span>{notice.text}</span>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="analysis-loading-container">
@@ -476,7 +532,7 @@ const AnalysisPage: React.FC = () => {
                     {predictionResult.ai_description}
                   </div>
                   <div style={{ marginTop: '1.5rem', padding: '10px', background: '#fff9c4', borderLeft: '4px solid #fbc02d', color: '#5d4037', fontSize: '0.85rem', borderRadius: '4px' }}>
-                    <strong>MEDICAL DISCLAIMER:</strong> AI may hallucinate and generate false or inacurate Statements. we are not responsible for any inconvenience. You are fully responsible for reviewing and verifying the AI's output before use
+                    <strong>MEDICAL DISCLAIMER:</strong> For research use only. Not for diagnostic use.
                   </div>
                 </div>
               </div>
@@ -502,7 +558,7 @@ const AnalysisPage: React.FC = () => {
               <div style={{ fontWeight: 600, color: 'white' }}>Clinical Assistant</div>
               <button onClick={() => setChatOpen(false)} style={{ background: 'none', border: 'none', color: 'white', fontSize: '1.5rem', cursor: 'pointer' }}>×</button>
             </div>
-            <div className="chatbot-messages" style={{ flex: 1, overflowY: 'auto', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div ref={chatMessagesRef} className="chatbot-messages" style={{ flex: 1, overflowY: 'scroll', padding: '15px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {chatMessages.map((m, i) => (
                 <div key={i} className={`chatbot-message ${m.role}`} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
                   <div style={{ 
