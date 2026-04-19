@@ -4224,8 +4224,9 @@ button {
 /* --- Modern Medical Dashboard - Analysis Page --- */
 
 .analysis-dashboard {
+  margin-top: 72px; /* Header Height */
+  height: calc(100vh - 72px);
   display: flex;
-  height: calc(100vh - 80px); /* Adjust based on Header height */
   overflow: hidden;
   background-color: #0b0118;
   color: #ffffff;
@@ -4262,15 +4263,30 @@ button {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: scroll;
   padding: 1.5rem;
   background: radial-gradient(circle at top right, rgba(65, 10, 92, 0.15), transparent);
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(106, 27, 154, 0.3) transparent;
+  min-height: 0; /* Critical for flex children to respect overflow */
+  overscroll-behavior: contain; /* Prevent scroll chaining to parent */
 }
 
 .dashboard-main::-webkit-scrollbar {
-  display: none;
+  width: 6px;
+}
+
+.dashboard-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dashboard-main::-webkit-scrollbar-thumb {
+  background: rgba(106, 27, 154, 0.3);
+  border-radius: 3px;
+}
+
+.dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(106, 27, 154, 0.5);
 }
 
 .analysis-dashboard {
@@ -4440,7 +4456,7 @@ button {
 .analysis-dashboard {
   margin-top: 72px; /* Header Height */
   height: calc(100vh - 72px);
-  min-height: 800px; /* Ensure enough space */
+  /* min-height removed: let dashboard-main scroll instead of forcing overflow */
 }
 
 .viewport-image-container {
@@ -4892,7 +4908,7 @@ button {
 .analysis-dashboard {
   position: relative;
   background-color: #ffffff !important; /* Base white */
-  overflow: hidden;
+  overflow: hidden; /* Outer container never scrolls - only dashboard-main scrolls */
   z-index: 1;
 }
 

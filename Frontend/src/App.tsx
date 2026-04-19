@@ -38,8 +38,6 @@ function ScrollHandler() {
         return;
       }
     }
-    // We only reset scroll if we're not doing a parallel transition, 
-    // as the SlideTransition handles the viewport positioning.
     const isSlideRoute = location.pathname === '/analysis' || location.pathname === '/history';
     if (!isSlideRoute) {
       window.scrollTo({ top: 0, left: 0, behavior: "auto" });
@@ -171,7 +169,6 @@ function App() {
           
           <SlideTransition>
             <Routes>
-              {/* Landing Page Route - NOT affected by Slide Transition logic (returns children directly) */}
               <Route
                 path="/"
                 element={
@@ -192,7 +189,6 @@ function App() {
                 }
               />
 
-              {/* Protected Workspace Routes - Slide Transition is active between these two */}
               <Route path="/analysis" element={<AnalysisRouteGuard />} />
               <Route path="/history" element={<HistoryRouteGuard />} />
             </Routes>
