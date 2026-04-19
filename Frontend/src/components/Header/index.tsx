@@ -203,7 +203,7 @@ function Header() {
             onClick={openLoginModal}
           >
             <span className="icon">👤</span>
-            <span className="login-text">Login</span>
+            <span className="login-text">Sign In</span>
           </button>
         ) : (
           <div className="user-profile-container" ref={profileRef}>

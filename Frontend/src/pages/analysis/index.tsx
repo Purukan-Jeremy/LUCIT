@@ -329,7 +329,7 @@ const AnalysisPage: React.FC = () => {
         <header className="dashboard-header">
           <div>
             <h1>Analysis Workspace</h1>
-            <div style={{ fontSize: '0.85rem', color: '#666' }}>LUCIT Medical Imaging v1.0</div>
+            <div style={{ fontSize: '0.85rem', color: '#666' }}>LUCIT</div>
           </div>
           <div className={`status-badge ${isAnalyzed ? 'active' : ''}`} style={{ background: isAnalyzed ? 'rgba(0, 200, 100, 0.1)' : 'rgba(0,0,0,0.05)', color: isAnalyzed ? '#00c864' : '#666' }}>
             {isLoading ? "PROCESSING" : isAnalyzed ? "COMPLETED" : "IDLE"}
@@ -476,7 +476,7 @@ const AnalysisPage: React.FC = () => {
                     {predictionResult.ai_description}
                   </div>
                   <div style={{ marginTop: '1.5rem', padding: '10px', background: '#fff9c4', borderLeft: '4px solid #fbc02d', color: '#5d4037', fontSize: '0.85rem', borderRadius: '4px' }}>
-                    <strong>MEDICAL DISCLAIMER:</strong> For research use only. Not for diagnostic use.
+                    <strong>MEDICAL DISCLAIMER:</strong> AI may hallucinate and generate false or inacurate Statements. we are not responsible for any inconvenience. You are fully responsible for reviewing and verifying the AI's output before use
                   </div>
                 </div>
               </div>

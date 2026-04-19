@@ -15,6 +15,10 @@ import HistoryPage from "./pages/history";
 import SplashScreen from "./components/SplashScreen";
 import Features from "./components/Features";
 import AboutUs from "./components/AboutUs";
+import SmoothScroll from "./components/SmoothScroll";
+import ScrollReveal from "./components/ScrollReveal";
+import TransitionPortal from "./components/TransitionPortal";
+import SlideTransition from "./components/SlideTransition";
 import {
   hasActiveSession,
   isSessionExpired,
@@ -34,7 +38,12 @@ function ScrollHandler() {
         return;
       }
     }
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    // We only reset scroll if we're not doing a parallel transition, 
+    // as the SlideTransition handles the viewport positioning.
+    const isSlideRoute = location.pathname === '/analysis' || location.pathname === '/history';
+    if (!isSlideRoute) {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    }
   }, [location]);
 
   return null;
@@ -42,7 +51,6 @@ function ScrollHandler() {
 
 function AnalysisRouteGuard() {
   const isLoggedIn = hasActiveSession();
-
   useEffect(() => {
     if (!isLoggedIn) {
       window.dispatchEvent(new Event("lucit:open-login"));
@@ -52,13 +60,11 @@ function AnalysisRouteGuard() {
   if (!isLoggedIn) {
     return <Navigate to="/" replace />;
   }
-
   return <AnalysisPage />;
 }
 
 function HistoryRouteGuard() {
   const isLoggedIn = hasActiveSession();
-
   useEffect(() => {
     if (!isLoggedIn) {
       window.dispatchEvent(new Event("lucit:open-login"));
@@ -68,7 +74,6 @@ function HistoryRouteGuard() {
   if (!isLoggedIn) {
     return <Navigate to="/" replace />;
   }
-
   return <HistoryPage />;
 }
 
@@ -106,11 +111,7 @@ function SessionManager() {
     };
 
     const activityEvents: Array<keyof WindowEventMap> = [
-      "pointerdown",
-      "keydown",
-      "scroll",
-      "touchstart",
-      "mousemove",
+      "pointerdown", "keydown", "scroll", "touchstart", "mousemove",
     ];
 
     activityEvents.forEach((eventName) =>
@@ -118,10 +119,7 @@ function SessionManager() {
     );
 
     const intervalId = window.setInterval(() => {
-      if (!hasActiveSession() || !isSessionExpired()) {
-        return;
-      }
-
+      if (!hasActiveSession() || !isSessionExpired()) return;
       logoutUser("expired");
     }, 60000);
 
@@ -152,16 +150,8 @@ function App() {
   const [showApp, setShowApp] = useState(false);
 
   useEffect(() => {
-    // Reveal app content slightly before splash fully disappears
-    const appTimer = setTimeout(() => {
-      setShowApp(true);
-    }, 4300);
-
-    // Remove splash after fade-out transition completes
-    const splashTimer = setTimeout(() => {
-      setShowSplash(false);
-    }, 5600);
-
+    const appTimer = setTimeout(() => setShowApp(true), 4300);
+    const splashTimer = setTimeout(() => setShowSplash(false), 5600);
     return () => {
       clearTimeout(appTimer);
       clearTimeout(splashTimer);
@@ -170,34 +160,45 @@ function App() {
 
   return (
     <Router>
-      <Toaster richColors position="top-right" />
-      <ScrollHandler />
-      <SessionManager />
-      {showSplash && <SplashScreen />}
-      <div className={`app-shell ${showApp ? "app-shell-visible" : ""}`}>
-        {/* Header ditaruh di luar Routes agar selalu muncul di semua halaman */}
-        <Header />
+      <SmoothScroll>
+        <TransitionPortal onComplete={() => {}} />
+        <Toaster richColors position="top-center" />
+        <ScrollHandler />
+        <SessionManager />
+        {showSplash && <SplashScreen />}
+        <div className={`app-shell ${showApp ? "app-shell-visible" : ""}`}>
+          <Header />
+          
+          <SlideTransition>
+            <Routes>
+              {/* Landing Page Route - NOT affected by Slide Transition logic (returns children directly) */}
+              <Route
+                path="/"
+                element={
+                  <>
+                    <ScrollReveal>
+                      <Hero />
+                    </ScrollReveal>
+                    <ScrollReveal delay={0.1}>
+                      <AboutUs />
+                    </ScrollReveal>
+                    <ScrollReveal delay={0.1}>
+                      <Features />
+                    </ScrollReveal>
+                    <ScrollReveal delay={0.1}>
+                      <Footer />
+                    </ScrollReveal>
+                  </>
+                }
+              />
 
-        <Routes>
-          {/* Halaman Utama (Home) */}
-          <Route
-            path="/"
-            element={
-              <>
-                <Hero />
-                <AboutUs />
-                <Features />
-              </>
-            }
-          />
-
-          {/* Halaman Analysis (Tujuan saat tombol ditekan) */}
-          <Route path="/analysis" element={<AnalysisRouteGuard />} />
-          <Route path="/history" element={<HistoryRouteGuard />} />
-        </Routes>
-
-        <Footer />
-      </div>
+              {/* Protected Workspace Routes - Slide Transition is active between these two */}
+              <Route path="/analysis" element={<AnalysisRouteGuard />} />
+              <Route path="/history" element={<HistoryRouteGuard />} />
+            </Routes>
+          </SlideTransition>
+        </div>
+      </SmoothScroll>
     </Router>
   );
 }
