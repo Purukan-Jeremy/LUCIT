@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify, session
-from src.controllers.user_controller import SignUpController, SignInController, SignOutController, SessionCheckController, UserController
+from src.controllers.user_controller import PasswordResetController, SignUpController, SignInController, SignOutController, SessionCheckController, UserController
 
 user_bp = Blueprint("user", __name__, url_prefix="/api")
 
@@ -48,5 +48,29 @@ def check_session():
         if result.get("status") == "success":
             return jsonify(result), 200
         return jsonify(result), 401
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@user_bp.route("/password-reset/request", methods=["POST"])
+def request_password_reset():
+    try:
+        data = request.get_json(silent=True) or {}
+        result = PasswordResetController.request_otp(data)
+        if result.get("status") == "success":
+            return jsonify(result), 200
+        return jsonify(result), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@user_bp.route("/password-reset/confirm", methods=["POST"])
+def confirm_password_reset():
+    try:
+        data = request.get_json(silent=True) or {}
+        result = PasswordResetController.confirm_reset(data)
+        if result.get("status") == "success":
+            return jsonify(result), 200
+        return jsonify(result), 400
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

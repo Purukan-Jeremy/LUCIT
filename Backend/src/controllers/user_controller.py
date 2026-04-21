@@ -1,5 +1,6 @@
 from flask import session
 
+from src.config.supabase import supabase
 from src.repositories.user_repository import SessionRepository, UserRepository
 
 
@@ -78,36 +79,72 @@ class SessionCheckController:
         }
 
 
+class PasswordResetController:
+    @staticmethod
+    def request_otp(payload):
+        email = (payload.get("email") or "").strip().lower()
+        if not email:
+            return {"status": "error", "message": "Email is required"}
+
+        user = UserRepository.find_user_by_email(email)
+        if not user:
+            return {"status": "error", "message": "Email is not registered"}
+
+        return {
+            "status": "success",
+            "message": f"Email {email} is registered and ready for OTP verification",
+        }
+
+    @staticmethod
+    def _extract_user_email(user_response):
+        user = getattr(user_response, "user", None)
+        if user is None and isinstance(user_response, dict):
+            user = user_response.get("user")
+
+        if user is None:
+            return None
+
+        email = getattr(user, "email", None)
+        if email is None and isinstance(user, dict):
+            email = user.get("email")
+        return (email or "").strip().lower() or None
+
+    @staticmethod
+    def confirm_reset(payload):
+        email = (payload.get("email") or "").strip().lower()
+        access_token = (payload.get("access_token") or "").strip()
+        new_password = payload.get("new_password")
+        confirm_password = payload.get("confirm_password")
+
+        if not email or not access_token or not new_password or not confirm_password:
+            return {"status": "error", "message": "Email, access token, and new password are required"}
+
+        if new_password != confirm_password:
+            return {"status": "error", "message": "Confirm password does not match"}
+
+        verified_user = supabase.auth.get_user(access_token)
+        verified_email = PasswordResetController._extract_user_email(verified_user)
+        if verified_email != email:
+            return {"status": "error", "message": "Supabase OTP verification does not match this email"}
+
+        user = UserRepository.find_user_by_email(email)
+        if not user:
+            return {"status": "error", "message": "Email is not registered"}
+
+        updated_user = UserRepository.update_password_by_email(email, new_password)
+
+        return {
+            "status": "success",
+            "message": "Password updated successfully",
+            "data": updated_user,
+        }
+
+
 def get_users():
     return UserController.get_users()
 
 
 def create_user(user_data):
-    """
-    Menyimpan user baru ke tabel tbl_users di Supabase.
-    user_data: dict berisi name, email, dan password.
-    """
-    email = user_data.get("email", "").lower().strip()
-    fullname = user_data.get("fullname")
-    password = user_data.get("password")
-
-    if not email or not password:
-        return {"status": "error", "message": "Email and password are required."}
-    
-    # Check if email already exists
-    # We use .eq() with the lowercased email for maximum reliability
-    existing_user = supabase.table("tbl_users").select("email").eq("email", email).execute()
-    
-    if existing_user.data and len(existing_user.data) > 0:
-        return {"status": "error", "message": "Email is already been registered!"}
-
-    response = supabase.table("tbl_users").insert({
-        "fullname": fullname,
-        "email": email,
-        "password": password # Catatan: Dalam produksi, password harus di-hash.
-    }).execute()
-    
-    return {"status": "success", "data": response.data}
     result = SignUpController.sign_up(user_data)
     if result.get("status") == "success":
         return result.get("data")
@@ -127,3 +164,11 @@ def logout_user():
 
 def check_user_session():
     return SessionCheckController.check_session()
+
+
+def request_password_reset_otp(payload):
+    return PasswordResetController.request_otp(payload)
+
+
+def confirm_password_reset(payload):
+    return PasswordResetController.confirm_reset(payload)
