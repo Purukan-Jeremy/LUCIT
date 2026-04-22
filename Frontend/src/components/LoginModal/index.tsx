@@ -29,7 +29,9 @@ function readResetOtpRateLimitState(email: string): ResetOtpRateLimitState {
     return { attempts: 0, cooldownEndsAt: 0 };
   }
 
-  const rawValue = sessionStorage.getItem(getResetOtpRateLimitStorageKey(normalizedEmail));
+  const rawValue = sessionStorage.getItem(
+    getResetOtpRateLimitStorageKey(normalizedEmail),
+  );
   if (!rawValue) {
     return { attempts: 0, cooldownEndsAt: 0 };
   }
@@ -49,7 +51,10 @@ function readResetOtpRateLimitState(email: string): ResetOtpRateLimitState {
   }
 }
 
-function writeResetOtpRateLimitState(email: string, state: ResetOtpRateLimitState) {
+function writeResetOtpRateLimitState(
+  email: string,
+  state: ResetOtpRateLimitState,
+) {
   const normalizedEmail = normalizeEmail(email);
   if (!normalizedEmail) return;
 
@@ -90,24 +95,36 @@ interface LoginModalProps {
   onLoginSuccess: (user: { fullname: string; email: string }) => void;
 }
 
-const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess }) => {
+const LoginModal: React.FC<LoginModalProps> = ({
+  isOpen,
+  onClose,
+  onLoginSuccess,
+}) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showResetNewPassword, setShowResetNewPassword] = useState(false);
-  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] =
+    useState(false);
   const [showForgotPasswordUI, setShowForgotPasswordUI] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isResetMode, setIsResetMode] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  
+
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
     password: "",
   });
-  
+
   const [resetEmail, setResetEmail] = useState("");
-  const [verificationCode, setVerificationCode] = useState(["", "", "", "", "", ""]);
+  const [verificationCode, setVerificationCode] = useState([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
   const [resetStep, setResetStep] = useState<"otp" | "password">("otp");
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
@@ -182,7 +199,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
     }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (e.key === "Backspace" && !verificationCode[index] && index > 0) {
       codeInputsRef.current[index - 1]?.focus();
     }
@@ -241,8 +261,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           onLoginSuccess(userData);
           onClose();
         } else {
-          setLoginAttempts(prev => prev + 1);
-          if (loginAttempts >= 0) { 
+          setLoginAttempts((prev) => prev + 1);
+          if (loginAttempts >= 0) {
             setShowForgotPasswordUI(true);
           }
           throw new Error(result.message || "Invalid credentials");
@@ -267,7 +287,8 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
       return;
     }
 
-    const currentRateLimitState = readResetOtpRateLimitState(normalizedResetEmail);
+    const currentRateLimitState =
+      readResetOtpRateLimitState(normalizedResetEmail);
     const remainingSeconds = Math.max(
       0,
       Math.ceil((currentRateLimitState.cooldownEndsAt - Date.now()) / 1000),
@@ -276,7 +297,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
     if (currentRateLimitState.attempts >= MAX_OTP_SEND_ATTEMPTS) {
       setOtpSendAttempts(currentRateLimitState.attempts);
       setResendTimer(remainingSeconds);
-      toast.error("You have reached the maximum of 3 verification code requests for this session.");
+      toast.error(
+        "You have reached the maximum of 3 verification code requests for this session.",
+      );
       return;
     }
 
@@ -292,17 +315,22 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
 
     try {
       const supabase = getSupabaseClient();
-      const response = await fetch(`${API_BASE_URL}/api/password-reset/request`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: normalizedResetEmail,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/password-reset/request`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: normalizedResetEmail,
+          }),
+        },
+      );
 
       const result = await parseApiBody(response);
       if (!response.ok) {
-        throw new Error(result.message || result.error || "Failed to send verification code");
+        throw new Error(
+          result.message || result.error || "Failed to send verification code",
+        );
       }
 
       const { error } = await supabase.auth.signInWithOtp({
@@ -313,14 +341,19 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
       });
 
       if (error) {
-        throw new Error(error.message || "Failed to send verification code via Supabase");
+        throw new Error(
+          error.message || "Failed to send verification code via Supabase",
+        );
       }
 
       setResetStep("otp");
       setVerificationCode(["", "", "", "", "", ""]);
       setResetAccessToken("");
       const nextAttempts = currentRateLimitState.attempts + 1;
-      const cooldownSeconds = OTP_SEND_COOLDOWNS_SEC[Math.min(nextAttempts - 1, OTP_SEND_COOLDOWNS_SEC.length - 1)];
+      const cooldownSeconds =
+        OTP_SEND_COOLDOWNS_SEC[
+          Math.min(nextAttempts - 1, OTP_SEND_COOLDOWNS_SEC.length - 1)
+        ];
       const nextRateLimitState = {
         attempts: nextAttempts,
         cooldownEndsAt: Date.now() + cooldownSeconds * 1000,
@@ -335,7 +368,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           : `Verification code sent. You can request a new code again in ${cooldownSeconds} seconds.`,
       );
     } catch (err) {
-      toast.error(getRequestErrorMessage(err, "Failed to send verification code"));
+      toast.error(
+        getRequestErrorMessage(err, "Failed to send verification code"),
+      );
     } finally {
       sendCodeInFlightRef.current = false;
       setIsSendingCode(false);
@@ -366,7 +401,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
 
       const accessToken = data.session?.access_token;
       if (!accessToken) {
-        throw new Error("Supabase did not return an authenticated session after OTP verification.");
+        throw new Error(
+          "Supabase did not return an authenticated session after OTP verification.",
+        );
       }
 
       setResetAccessToken(accessToken);
@@ -399,33 +436,43 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
 
     try {
       const supabase = getSupabaseClient();
-      const response = await fetch(`${API_BASE_URL}/api/password-reset/confirm`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: resetEmail,
-          access_token: resetAccessToken,
-          new_password: newPassword,
-          confirm_password: confirmNewPassword,
-        }),
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/password-reset/confirm`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: resetEmail,
+            access_token: resetAccessToken,
+            new_password: newPassword,
+            confirm_password: confirmNewPassword,
+          }),
+        },
+      );
 
       const result = await parseApiBody(response);
       if (!response.ok) {
-        throw new Error(result.message || result.error || "Failed to reset password");
+        throw new Error(
+          result.message || result.error || "Failed to reset password",
+        );
       }
 
       const { error: supabasePasswordError } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      const supabasePasswordMessage = (supabasePasswordError?.message || "").toLowerCase();
+      const supabasePasswordMessage = (
+        supabasePasswordError?.message || ""
+      ).toLowerCase();
       const isSamePasswordError =
         supabasePasswordMessage.includes("different from the old password") ||
         supabasePasswordMessage.includes("same as the old password");
 
       if (supabasePasswordError && !isSamePasswordError) {
-        throw new Error(supabasePasswordError.message || "Failed to update password in Supabase");
+        throw new Error(
+          supabasePasswordError.message ||
+            "Failed to update password in Supabase",
+        );
       }
 
       toast.success(result.message || "Password updated successfully.");
@@ -457,24 +504,26 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
     return (
       <div className="modal-overlay" onClick={onClose}>
         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+          <button className="modal-close" onClick={onClose}>
+            &times;
+          </button>
           <h2 className="modal-title">Reset Password</h2>
           <p className="modal-subtitle">
             {resetStep === "otp"
               ? "Enter your email and the verification code sent to you"
               : "Set your new password after OTP verification"}
           </p>
-          
+
           <div className="reset-form-container">
             <div className="form-group">
               <label>Email Address</label>
-              <input 
-                type="email" 
-                placeholder="name@example.com" 
+              <input
+                type="email"
+                placeholder="name@example.com"
                 value={resetEmail}
                 onChange={(e) => setResetEmail(e.target.value)}
                 disabled={resetStep === "password"}
-                required 
+                required
               />
             </div>
 
@@ -489,7 +538,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                         type="text"
                         maxLength={1}
                         value={digit}
-                        ref={(el) => (codeInputsRef.current[i] = el)}
+                        ref={(el) => {
+                          codeInputsRef.current[i] = el;
+                        }}
                         onChange={(e) => handleCodeChange(i, e.target.value)}
                         onKeyDown={(e) => handleKeyDown(i, e)}
                         className="code-input"
@@ -498,11 +549,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                   </div>
                 </div>
 
-                <button 
-                  className="secondary-btn" 
-                  onClick={handleSendCode} 
-                  disabled={resendTimer > 0 || isLoading || isSendingCode || hasReachedOtpSendLimit}
-                  style={{ width: '100%', marginBottom: '10px' }}
+                <button
+                  className="secondary-btn"
+                  onClick={handleSendCode}
+                  disabled={
+                    resendTimer > 0 ||
+                    isLoading ||
+                    isSendingCode ||
+                    hasReachedOtpSendLimit
+                  }
+                  style={{ width: "100%", marginBottom: "10px" }}
                 >
                   {isSendingCode || isLoading
                     ? "Processing..."
@@ -512,13 +568,20 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                         ? `Send again in ${resendTimer}s`
                         : "Send Verification Code"}
                 </button>
-                <p className="modal-subtitle" style={{ marginTop: "0", marginBottom: "12px" }}>
+                <p
+                  className="modal-subtitle"
+                  style={{ marginTop: "0", marginBottom: "12px" }}
+                >
                   {hasReachedOtpSendLimit
                     ? "You have used all 3 verification code requests for this session."
                     : `${Math.max(0, MAX_OTP_SEND_ATTEMPTS - otpSendAttempts)} verification code request(s) remaining.`}
                 </p>
-                
-                <button className="submit-btn" onClick={handleVerifyOtp} disabled={isLoading}>
+
+                <button
+                  className="submit-btn"
+                  onClick={handleVerifyOtp}
+                  disabled={isLoading}
+                >
                   {isLoading ? "Processing..." : "Confirm OTP"}
                 </button>
               </>
@@ -538,19 +601,66 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                       type="button"
                       className="password-toggle"
                       onClick={() => setShowResetNewPassword((prev) => !prev)}
-                      aria-label={showResetNewPassword ? "Hide password" : "Show password"}
+                      aria-label={
+                        showResetNewPassword ? "Hide password" : "Show password"
+                      }
                     >
                       {showResetNewPassword ? (
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="password-toggle-icon">
-                          <path d="M3 3L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                          <path d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M9.88 5.09A10.94 10.94 0 0112 4.91c5 0 8.27 4.19 9 5.09-.35.43-1.28 1.52-2.72 2.58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M6.61 6.61C4.54 7.97 3.28 9.66 3 10c.73.9 4 5.09 9 5.09 1.5 0 2.86-.38 4.08-.96" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="password-toggle-icon"
+                        >
+                          <path
+                            d="M3 3L21 21"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M9.88 5.09A10.94 10.94 0 0112 4.91c5 0 8.27 4.19 9 5.09-.35.43-1.28 1.52-2.72 2.58"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M6.61 6.61C4.54 7.97 3.28 9.66 3 10c.73.9 4 5.09 9 5.09 1.5 0 2.86-.38 4.08-.96"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                       ) : (
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="password-toggle-icon">
-                          <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="password-toggle-icon"
+                        >
+                          <path
+                            d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <circle
+                            cx="12"
+                            cy="12"
+                            r="3"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          />
                         </svg>
                       )}
                     </button>
@@ -570,37 +680,92 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                     <button
                       type="button"
                       className="password-toggle"
-                      onClick={() => setShowResetConfirmPassword((prev) => !prev)}
-                      aria-label={showResetConfirmPassword ? "Hide password" : "Show password"}
+                      onClick={() =>
+                        setShowResetConfirmPassword((prev) => !prev)
+                      }
+                      aria-label={
+                        showResetConfirmPassword
+                          ? "Hide password"
+                          : "Show password"
+                      }
                     >
                       {showResetConfirmPassword ? (
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="password-toggle-icon">
-                          <path d="M3 3L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                          <path d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M9.88 5.09A10.94 10.94 0 0112 4.91c5 0 8.27 4.19 9 5.09-.35.43-1.28 1.52-2.72 2.58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M6.61 6.61C4.54 7.97 3.28 9.66 3 10c.73.9 4 5.09 9 5.09 1.5 0 2.86-.38 4.08-.96" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="password-toggle-icon"
+                        >
+                          <path
+                            d="M3 3L21 21"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M9.88 5.09A10.94 10.94 0 0112 4.91c5 0 8.27 4.19 9 5.09-.35.43-1.28 1.52-2.72 2.58"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <path
+                            d="M6.61 6.61C4.54 7.97 3.28 9.66 3 10c.73.9 4 5.09 9 5.09 1.5 0 2.86-.38 4.08-.96"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                       ) : (
-                        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="password-toggle-icon">
-                          <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          className="password-toggle-icon"
+                        >
+                          <path
+                            d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                          <circle
+                            cx="12"
+                            cy="12"
+                            r="3"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                          />
                         </svg>
                       )}
                     </button>
                   </div>
                 </div>
 
-                <button className="submit-btn" onClick={handleConfirmReset} disabled={isLoading}>
+                <button
+                  className="submit-btn"
+                  onClick={handleConfirmReset}
+                  disabled={isLoading}
+                >
                   {isLoading ? "Processing..." : "Update Password"}
                 </button>
               </>
             )}
 
-            <div className="modal-footer" style={{ marginTop: '20px' }}>
-              <button 
-                type="button" 
-                className="toggle-mode-btn" 
-                style={{ display: 'block', width: '100%' }}
+            <div className="modal-footer" style={{ marginTop: "20px" }}>
+              <button
+                type="button"
+                className="toggle-mode-btn"
+                style={{ display: "block", width: "100%" }}
                 onClick={() => {
                   setIsResetMode(false);
                   setResetStep("otp");
@@ -621,10 +786,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
         <button className="modal-close" onClick={onClose}>
           &times;
         </button>
-        
-        <h2 className="modal-title">{isSignUp ? "Create an Account" : "Sign In"}</h2>
+
+        <h2 className="modal-title">
+          {isSignUp ? "Create an Account" : "Sign In"}
+        </h2>
         <p className="modal-subtitle">
-          {isSignUp ? "Fill in the details to get started" : "Enter your email and password to continue"}
+          {isSignUp
+            ? "Fill in the details to get started"
+            : "Enter your email and password to continue"}
         </p>
 
         <div className="login-options">
@@ -632,26 +801,26 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
             {isSignUp && (
               <div className="form-group">
                 <label htmlFor="fullName">Full Name</label>
-                <input 
-                  type="text" 
-                  id="fullName" 
-                  placeholder="Enter your full name" 
+                <input
+                  type="text"
+                  id="fullName"
+                  placeholder="Enter your full name"
                   value={formData.fullName}
                   onChange={handleInputChange}
-                  required 
+                  required
                 />
               </div>
             )}
 
             <div className="form-group">
               <label htmlFor="email">Email Address</label>
-              <input 
-                type="email" 
-                id="email" 
-                placeholder="name@example.com" 
+              <input
+                type="email"
+                id="email"
+                placeholder="name@example.com"
                 value={formData.email}
                 onChange={handleInputChange}
-                required 
+                required
               />
             </div>
 
@@ -661,7 +830,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                 <input
                   type={showPassword ? "text" : "password"}
                   id="password"
-                  placeholder={isSignUp ? "Create a password" : "Enter your password"}
+                  placeholder={
+                    isSignUp ? "Create a password" : "Enter your password"
+                  }
                   value={formData.password}
                   onChange={handleInputChange}
                   required
@@ -673,25 +844,70 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="password-toggle-icon">
-                      <path d="M3 3L21 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                      <path d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M9.88 5.09A10.94 10.94 0 0112 4.91c5 0 8.27 4.19 9 5.09-.35.43-1.28 1.52-2.72 2.58" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M6.61 6.61C4.54 7.97 3.28 9.66 3 10c.73.9 4 5.09 9 5.09 1.5 0 2.86-.38 4.08-.96" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="password-toggle-icon"
+                    >
+                      <path
+                        d="M3 3L21 21"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                      <path
+                        d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M9.88 5.09A10.94 10.94 0 0112 4.91c5 0 8.27 4.19 9 5.09-.35.43-1.28 1.52-2.72 2.58"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M6.61 6.61C4.54 7.97 3.28 9.66 3 10c.73.9 4 5.09 9 5.09 1.5 0 2.86-.38 4.08-.96"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   ) : (
-                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" className="password-toggle-icon">
-                      <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      className="password-toggle-icon"
+                    >
+                      <path
+                        d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="3"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      />
                     </svg>
                   )}
                 </button>
               </div>
-              
+
               {!isSignUp && showForgotPasswordUI && (
                 <div className="forgot-password-link-container">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="forgot-password-btn"
                     onClick={() => setIsResetMode(true)}
                   >
@@ -707,8 +923,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
                   <span className="button-spinner" />
                   <span>Processing...</span>
                 </>
+              ) : isSignUp ? (
+                "Sign Up"
               ) : (
-                isSignUp ? "Sign Up" : "Sign In"
+                "Sign In"
               )}
             </button>
           </form>
@@ -716,9 +934,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLoginSuccess
           <div className="modal-footer">
             <p>
               {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
-              <button 
-                type="button" 
-                className="toggle-mode-btn" 
+              <button
+                type="button"
+                className="toggle-mode-btn"
                 onClick={() => {
                   setIsSignUp(!isSignUp);
                   setShowPassword(false);

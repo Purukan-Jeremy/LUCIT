@@ -1,11 +1,8 @@
-import { useNavigate } from "react-router-dom";
 import "../../assets/style.css";
 import { hasActiveSession } from "../../utils/session";
 import React from "react";
 
 function Hero() {
-  const navigate = useNavigate();
-
   const handleStartDetection = (e: React.MouseEvent<HTMLButtonElement>) => {
     if (!hasActiveSession()) {
       window.dispatchEvent(new Event("lucit:open-login"));
@@ -18,9 +15,11 @@ function Hero() {
     const y = rect.top + rect.height / 2;
 
     // Trigger global transition event
-    window.dispatchEvent(new CustomEvent("lucit:start-transition", {
-      detail: { x, y, target: "/analysis" }
-    }));
+    window.dispatchEvent(
+      new CustomEvent("lucit:start-transition", {
+        detail: { x, y, target: "/analysis" },
+      }),
+    );
   };
 
   return (
