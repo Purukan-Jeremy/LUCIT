@@ -2702,7 +2702,7 @@ button {
   overflow: hidden;
   background-image:
     linear-gradient(rgba(245, 246, 248, 0.74), rgba(245, 246, 248, 0.74)),
-    url("/images/1.jpg");
+    url("./images/1.jpg");
   background-size: cover;
   background-position: center;
 }
