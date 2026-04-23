@@ -12,9 +12,8 @@ function Footer() {
             <span className="logo-cit">CIT</span>
           </div>
           <p className="footer-tagline">
-            Intelligent Histopathology Decision Support. 
-            Empowering pathologists with AI-driven insights for 
-            lung and colon cancer detection.
+            Lung and Colon Cancer Detection Using Interpretable Transfer
+            Learning
           </p>
           <div className="disclaimer-mini">
             <span>Research-only version. Not for clinical diagnosis.</span>
