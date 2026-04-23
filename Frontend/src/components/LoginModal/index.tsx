@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import "../../assets/style.css";
 import { storeAuthenticatedUser } from "../../utils/session";
@@ -229,7 +230,9 @@ const LoginModal: React.FC<LoginModalProps> = ({
           setIsSignUp(false);
           setFormData({ fullName: "", email: "", password: "" });
         } else {
-          throw new Error(result.message || result.error || "Failed to sign up");
+          throw new Error(
+            result.message || result.error || "Failed to sign up",
+          );
         }
       } catch (err) {
         toast.error(getRequestErrorMessage(err, "Something went wrong"));
@@ -313,16 +316,13 @@ const LoginModal: React.FC<LoginModalProps> = ({
 
     try {
       const supabase = getSupabaseClient();
-      const response = await fetch(
-        getApiUrl("/api/password-reset/request"),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: normalizedResetEmail,
-          }),
-        },
-      );
+      const response = await fetch(getApiUrl("/api/password-reset/request"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: normalizedResetEmail,
+        }),
+      });
 
       const result = await parseApiBody(response);
       if (!response.ok) {
@@ -434,19 +434,16 @@ const LoginModal: React.FC<LoginModalProps> = ({
 
     try {
       const supabase = getSupabaseClient();
-      const response = await fetch(
-        getApiUrl("/api/password-reset/confirm"),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: resetEmail,
-            access_token: resetAccessToken,
-            new_password: newPassword,
-            confirm_password: confirmNewPassword,
-          }),
-        },
-      );
+      const response = await fetch(getApiUrl("/api/password-reset/confirm"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: resetEmail,
+          access_token: resetAccessToken,
+          new_password: newPassword,
+          confirm_password: confirmNewPassword,
+        }),
+      });
 
       const result = await parseApiBody(response);
       if (!response.ok) {
