@@ -229,7 +229,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
           setIsSignUp(false);
           setFormData({ fullName: "", email: "", password: "" });
         } else {
-          throw new Error(result.error || "Failed to sign up");
+          throw new Error(result.message || result.error || "Failed to sign up");
         }
       } catch (err) {
         toast.error(getRequestErrorMessage(err, "Something went wrong"));
