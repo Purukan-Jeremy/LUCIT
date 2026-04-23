@@ -3463,7 +3463,7 @@ button {
 .delete-item-btn {
   background: none;
   border: none;
-  color: #ffcdd2;
+  color: #e57373;
   cursor: pointer;
   padding: 10px;
   border-radius: 10px;
@@ -3476,7 +3476,7 @@ button {
 }
 
 .expand-chevron {
-  color: #ccc;
+  color: #000000;
   transition: transform 0.3s;
 }
 
@@ -4040,6 +4040,14 @@ button {
   flex-direction: column;
   gap: 4px;
   text-align: center;
+}
+
+.history-stats-mini .stat-label {
+  color: #666;
+}
+
+.history-stats-mini .stat-value {
+  color: #1a1a1a;
 }
 
 .stat-label {
