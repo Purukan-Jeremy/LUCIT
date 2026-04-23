@@ -24,16 +24,39 @@ class SignUpController:
         email = (user_data.get("email") or "").strip()
         password = user_data.get("password")
         confirm_password = user_data.get("confirm_password")
-
-        existing_users = UserRepository.find_user_by_email(email)
-        if existing_users:
-            return {"status": "error", "message": "Email is already in use"}
+        fullname = user_data.get("fullname", "")
 
         if confirm_password is not None and password != confirm_password:
             return {"status": "error", "message": "Confirm password is incorrect"}
 
-        created_user = UserRepository.create_user(user_data)
-        return {"status": "success", "message": "User created successfully", "data": created_user}
+        try:
+            # 1. Register into Supabase Auth (auth.users)
+            auth_res = supabase.auth.sign_up({
+                "email": email,
+                "password": password
+            })
+            
+            # Check if user already exists in auth or signup failed without throwing exception
+            if not auth_res or not auth_res.user:
+                return {"status": "error", "message": "Failed to create user in Auth"}
+
+            # 2. Insert into tbl_users (synchronization)
+            try:
+                # We check first if email in tbl_users to avoid duplicate
+                existing_users = UserRepository.find_user_by_email(email)
+                if not existing_users:
+                    UserRepository.create_user(user_data)
+            except Exception as insert_err:
+                # If insertion fails due to RLS or unique constraint, we just log/pass
+                pass
+
+            return {"status": "success", "message": "User created successfully", "data": {"email": email}}
+        except Exception as e:
+            # Handle user existing in Auth
+            msg = str(e).lower()
+            if "already registered" in msg or "already exists" in msg:
+                return {"status": "error", "message": "Email is already in use"}
+            return {"status": "error", "message": str(e)}
 
 
 class SignInController:
@@ -42,18 +65,38 @@ class SignInController:
         email = credentials.get("email")
         password = credentials.get("password")
 
-        users = UserRepository.find_user_by_credentials(email, password)
+        try:
+            # 1. Login via Supabase Auth FIRST
+            auth_res = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": password
+            })
+            
+            user_auth = auth_res.user
+            if not user_auth:
+                return {"status": "error", "message": "Invalid credentials"}
+            
+            # 2. Try fetching from tbl_users for fullname
+            fullname_var = email
+            users = UserRepository.find_user_by_email(email)
+            if users:
+                fullname_var = users[0].get("fullname", email)
 
-        if not users:
-            return {"status": "error", "message": "Email or password is incorrect"}
+            # Define session data
+            user = {
+                "id": str(user_auth.id),
+                "fullname": fullname_var,
+                "email": user_auth.email,
+            }
+            
+            session["user"] = user
+            return {"status": "success", "message": "Email and password correct", "user": user}
 
-        user = users[0]
-        session["user"] = {
-            "id": user.get("id"),
-            "fullname": user.get("fullname"),
-            "email": user.get("email"),
-        }
-        return {"status": "success", "message": "Email and password correct", "user": user}
+        except Exception as e:
+            msg = str(e).lower()
+            if "invalid login credentials" in msg:
+                return {"status": "error", "message": "Email or password is incorrect"}
+            return {"status": "error", "message": str(e)}
 
 
 class SignOutController:
