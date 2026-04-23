@@ -65,8 +65,24 @@ class SignInController:
         email = credentials.get("email")
         password = credentials.get("password")
 
+        # 1. Fallback / Legacy Strategy: Check tbl_users directly FIRST
+        # This allows users created via the old method (only in tbl_users) to login safely
         try:
-            # 1. Login via Supabase Auth FIRST
+            users = UserRepository.find_user_by_credentials(email, password)
+            if users:
+                user = users[0]
+                session_user = {
+                    "id": str(user.get("id")),
+                    "fullname": user.get("fullname", email),
+                    "email": user.get("email"),
+                }
+                session["user"] = session_user
+                return {"status": "success", "message": "Email and password correct", "user": session_user}
+        except Exception as e:
+            pass # fallback to Supabase Auth if table query errors out
+
+        # 2. Supabase Auth Strategy
+        try:
             auth_res = supabase.auth.sign_in_with_password({
                 "email": email,
                 "password": password
@@ -74,29 +90,28 @@ class SignInController:
             
             user_auth = auth_res.user
             if not user_auth:
-                return {"status": "error", "message": "Invalid credentials"}
+                return {"status": "error", "message": "Email or password is incorrect"}
             
-            # 2. Try fetching from tbl_users for fullname
             fullname_var = email
             users = UserRepository.find_user_by_email(email)
             if users:
                 fullname_var = users[0].get("fullname", email)
 
-            # Define session data
-            user = {
+            session_user = {
                 "id": str(user_auth.id),
                 "fullname": fullname_var,
                 "email": user_auth.email,
             }
             
-            session["user"] = user
-            return {"status": "success", "message": "Email and password correct", "user": user}
+            session["user"] = session_user
+            return {"status": "success", "message": "Email and password correct", "user": session_user}
 
         except Exception as e:
             msg = str(e).lower()
             if "invalid login credentials" in msg:
                 return {"status": "error", "message": "Email or password is incorrect"}
             return {"status": "error", "message": str(e)}
+
 
 
 class SignOutController:
