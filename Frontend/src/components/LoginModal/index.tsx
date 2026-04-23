@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef } from "react";
-import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import "../../assets/style.css";
 import { storeAuthenticatedUser } from "../../utils/session";
