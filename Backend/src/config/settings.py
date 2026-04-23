@@ -9,9 +9,12 @@ def _parse_csv_env(value):
         return []
     return [item.strip() for item in value.split(",") if item.strip()]
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_DESCRIPTION_MODEL = os.getenv("GEMINI_DESCRIPTION_MODEL", "gemini-2.0-flash")
-GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-1.5-flash")
+VERTEX_API_KEY = os.getenv("VERTEX_API_KEY")
+VERTEX_PROJECT_ID = os.getenv("VERTEX_PROJECT_ID")
+VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "us-central1")
+
+GEMINI_DESCRIPTION_MODEL = os.getenv("GEMINI_DESCRIPTION_MODEL", "gemini-2.5-flash")
+GEMINI_CHAT_MODEL = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
 FLASK_SECRET_KEY = os.getenv("FLASK_SECRET_KEY", "lucit-dev-secret-key")
 FLASK_ENV = os.getenv("FLASK_ENV", "production").lower()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://lucit.dev").strip()

@@ -88,6 +88,7 @@ class ResultRepository:
             "prediction_label": _build_prediction_label(result),
             "confidence_score": _build_confidence_score(result),
             "description": result.get("ai_description"),
+            "created_at": __import__("datetime").datetime.utcnow().isoformat(),
         }
 
         print(f"[Repo] Inserting analysis for user {user_id_val}...")

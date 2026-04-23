@@ -402,7 +402,18 @@ const AnalysisPage: React.FC = () => {
             >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
             </svg>
-            <div style={{ fontSize: "0.8rem", opacity: 0.8 }}>
+            <div
+              style={{
+                fontSize: "0.8rem",
+                opacity: 0.8,
+                wordBreak: "break-all",
+                overflowWrap: "break-word",
+                whiteSpace: "normal",
+                maxWidth: "100%",
+                padding: "0 10px",
+                textAlign: "center",
+              }}
+            >
               {selectedImage
                 ? selectedImage.name
                 : "Upload Histopathology Image"}

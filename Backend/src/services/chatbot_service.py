@@ -1,5 +1,5 @@
-import google.generativeai as genai
-from src.config.settings import GEMINI_API_KEY, GEMINI_CHAT_MODEL
+from src.config.settings import GEMINI_CHAT_MODEL
+from src.services.vertex_rest_client import VertexRestClient, VertexApiError
 
 OUT_OF_SCOPE_REPLY = "I'm sorry, but I can only answer questions related to the analysis results."
 
@@ -85,10 +85,7 @@ class LLMService:
         if not _is_analysis_related(message, analysis_context, chat_history):
             return OUT_OF_SCOPE_REPLY
 
-        if not GEMINI_API_KEY:
-            return "Chatbot is unavailable because GEMINI_API_KEY is not configured."
-
-        genai.configure(api_key=GEMINI_API_KEY)
+        # Validation of API configurations is now handled entirely within VertexRestClient
 
         prediction = analysis_context.get("prediction", "Unknown")
         confidence = analysis_context.get("confidence")
@@ -141,25 +138,11 @@ Answer in 1-3 short paragraphs, relevant to the analysis results above."""
         last_error = None
         for model_name in _chat_candidate_models():
             try:
+                
+                # Use raw REST API instead of Google GenAI SDK
                 print(f"[Chatbot] Attempting with model: {model_name}")
-                model = genai.GenerativeModel(model_name)
-                response = model.generate_content(prompt)
-
-                if not response.candidates:
-                    print(f"[Chatbot] Model '{model_name}' returned no candidates.")
-                    continue
-
-                try:
-                    text = response.text
-                except (AttributeError, ValueError) as e:
-                    print(f"[Chatbot] Could not extract text from '{model_name}': {e}")
-                    if response.candidates:
-                        candidate = response.candidates[0]
-                        parts = getattr(candidate.content, "parts", [])
-                        text = "".join([getattr(p, "text", "") for p in parts])
-                    else:
-                        text = ""
-
+                text = VertexRestClient.generate_content(model_id=model_name, prompt=prompt)
+                
                 text = (text or "").strip().replace("**", "").replace("*", "")
                 if text:
                     print(f"[Chatbot] Success using model: {model_name}")

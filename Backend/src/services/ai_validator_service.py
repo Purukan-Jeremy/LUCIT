@@ -1,14 +1,13 @@
-import google.generativeai as genai
+from src.services.vertex_rest_client import VertexRestClient, VertexApiError
 import base64
 import json
 import hashlib
 from io import BytesIO
 import numpy as np
 from PIL import Image
-from src.config.settings import GEMINI_API_KEY, GEMINI_DESCRIPTION_MODEL
+from src.config.settings import GEMINI_DESCRIPTION_MODEL
 
-_genai_configured = False
-_description_model_cache = {}
+# Variables that were for GenAI are removed
 validation_cache = {}
 description_cache = {}
 segmentation_description_cache = {}  
@@ -28,18 +27,7 @@ def _candidate_models():
     return [m for i, m in enumerate(models) if m and m not in models[:i]]
 
 
-def get_description_model(model_name: str | None = None):
-    global _genai_configured
-
-    if not _genai_configured:
-        genai.configure(api_key=GEMINI_API_KEY)
-        _genai_configured = True
-
-    resolved_name = model_name or GEMINI_DESCRIPTION_MODEL
-    if resolved_name not in _description_model_cache:
-        _description_model_cache[resolved_name] = genai.GenerativeModel(resolved_name)
-
-    return _description_model_cache[resolved_name]
+# Removed get_description_model since we use REST Client directly
 
 
 def _encode_image_for_gemini(image_bytes: bytes, max_side: int = 768, quality: int = 82) -> str:
@@ -67,19 +55,20 @@ def _generate_with_fallback(prompt: str, image_base64: str):
     last_error = None
     for model_name in _candidate_models():
         try:
-            response = get_description_model(model_name).generate_content(
-                [
-                    prompt,
-                    {
-                        "mime_type": "image/jpeg",
-                        "data": image_base64,
-                    },
-                ]
-            )
-            return response, model_name
+            # We skip passing the raw text response as an object wrapper,
+            # and just return the extracted text string directly for compatibility with callers 
+            # if we adapt the callers to expect plain strings.
+            # Wait, current callers expect `response.text`.
+            # Let's wrap the text in a mock object so we don't have to refactor callers.
+            text = VertexRestClient.generate_content(model_id=model_name, prompt=prompt, image_base64=image_base64)
+            
+            class MockResponse:
+                def __init__(self, text):
+                    self.text = text
+            return MockResponse(text), model_name
         except Exception as e:
             last_error = e
-            print(f"Gemini model '{model_name}' failed: {e}")
+            print(f"Vertex API model '{model_name}' failed: {e}")
 
     raise RuntimeError(f"All Gemini model candidates failed. Last error: {last_error}")
 
@@ -186,9 +175,8 @@ def generate_ai_description_segmentation(
     area_stats: dict,
     overlay_base64: str = None,
 ) -> str:
-    if not GEMINI_API_KEY:
-        print("Warning: GEMINI_API_KEY not configured, using local English segmentation description.")
-        return _build_local_segmentation_description(area_stats)
+    # Using the local fallback immediately if REST config errors out implicitly,
+    # but we will just pass it to the generator and let it handle the error.
 
     image_hash = hashlib.md5(image_bytes).hexdigest()
     stats_hash = hashlib.md5(json.dumps(area_stats, sort_keys=True).encode()).hexdigest()
@@ -313,8 +301,7 @@ def validate_histopathology(image_bytes):
 
 
 def generate_ai_description(image_bytes, prediction: str, confidence: float, gradcam_base64: str = None) -> str:
-    if not GEMINI_API_KEY:
-        return "AI description unavailable: API key not configured"
+    # Removed GEMINI_API_KEY validation here as it's handled by VertexRestClient
 
     image_hash = hashlib.md5(image_bytes).hexdigest()
     cache_key  = f"{image_hash}:{prediction}:{confidence:.6f}"
