@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import "../../assets/style.css";
 import { readStoredUser } from "../../utils/session";
 import { getApiUrl } from "../../utils/api";
+import { resolveImageSrc } from "../../utils/image";
 
 function formatPredictionLabel(prediction: string) {
   if (!prediction) return "Unknown";
@@ -351,7 +352,7 @@ function HistoryPage() {
                   >
                     <div className="history-item-main" onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}>
                       <div className="item-specimen-preview">
-                        <img src={item.originalImage} alt="Specimen" />
+                        <img src={resolveImageSrc(item.originalImage)} alt="Specimen" />
                         {!isSegmentation && <div className={`organ-tag ${item.variant}`}>{item.variant.toUpperCase()}</div>}
                       </div>
                       
@@ -405,13 +406,13 @@ function HistoryPage() {
                             <div className="visual-card">
                               <span className="visual-label">Feature Heatmap</span>
                               <div className="visual-box">
-                                <img src={item.heatmapImage} alt="Heatmap" />
+                                <img src={resolveImageSrc(item.heatmapImage)} alt="Heatmap" />
                               </div>
                             </div>
                             <div className="visual-card">
                               <span className="visual-label">Diagnostic Overlay</span>
                               <div className="visual-box">
-                                <img src={item.overlayImage} alt="Overlay" />
+                                <img src={resolveImageSrc(item.overlayImage)} alt="Overlay" />
                               </div>
                             </div>
                           </div>
