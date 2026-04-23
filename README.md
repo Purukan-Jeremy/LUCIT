@@ -102,3 +102,36 @@ npm run dev
 
 3. Error: "Unauthorized" atau Masalah Database
    Solusi: Cek file ".env" Anda. Pastikan file itu ada di dalam folder Backend dan kodenya benar.
+
+---------------------------------------------------------
+🌐 DEPLOYMENT APACHE (lucit.dev)
+---------------------------------------------------------
+
+Untuk production di `https://lucit.dev`, gunakan pola berikut:
+
+- Frontend build static diserve oleh Apache.
+- Apache me-reverse-proxy `/api` ke Flask di `127.0.0.1:8000`.
+- `Frontend/.env.production` biarkan `VITE_API_URL=` kosong agar frontend memanggil `/api/...` di domain yang sama.
+
+File contoh:
+
+- Frontend env: `Frontend/.env.production.example`
+- Backend env: `Backend/.env.example`
+
+Langkah ringkas:
+
+1. Backend:
+   - Salin `Backend/.env.example` menjadi `Backend/.env`
+   - Isi `SUPABASE_URL`, `SUPABASE_KEY`, `FLASK_SECRET_KEY`, dan SMTP bila dipakai
+   - Jalankan Flask/Gunicorn di `127.0.0.1:8000`
+
+2. Frontend:
+   - Salin `Frontend/.env.production.example` menjadi `Frontend/.env.production`
+   - Build:
+     `npm run build`
+
+3. Apache:
+   - Aktifkan module: `proxy`, `proxy_http`, `headers`, `rewrite`, `ssl`
+   - Arahkan `DocumentRoot` ke folder hasil build frontend
+
+Jika `VITE_API_URL` diisi `http://localhost:8000` pada server production, browser user akan mencoba mengakses backend di komputer mereka sendiri, bukan di server Anda. Itu sebabnya sign in/sign up gagal.

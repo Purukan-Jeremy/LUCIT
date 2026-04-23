@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../../assets/style.css";
 import { hasActiveSession } from "../../utils/session";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+import { getApiUrl } from "../../utils/api";
 const ANALYSIS_HISTORY_KEY = "lucit_analysis_history";
 type ChatMessage = { role: "user" | "assistant"; text: string };
 
@@ -207,7 +206,7 @@ const AnalysisPage: React.FC = () => {
     formData.append("model_type", modelType);
     try {
       setIsLoading(true);
-      const res = await fetch(`${API_BASE_URL}/api/predict`, {
+      const res = await fetch(getApiUrl("/api/predict"), {
         method: "POST",
         body: formData,
       });
@@ -274,7 +273,7 @@ const AnalysisPage: React.FC = () => {
     setChatInput("");
     setIsChatLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/chat`, {
+      const res = await fetch(getApiUrl("/api/chat"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

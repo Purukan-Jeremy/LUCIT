@@ -3,9 +3,7 @@ import { toast } from "sonner";
 import "../../assets/style.css";
 import { storeAuthenticatedUser } from "../../utils/session";
 import { getSupabaseClient } from "../../utils/supabase";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
-const API_TARGET_LABEL = API_BASE_URL || "Vite proxy (/api -> 127.0.0.1:8000)";
+import { API_TARGET_LABEL, getApiUrl } from "../../utils/api";
 const OTP_SEND_COOLDOWNS_SEC = [60, 90, 120];
 const MAX_OTP_SEND_ATTEMPTS = 3;
 const RESET_OTP_RATE_LIMIT_STORAGE_PREFIX = "lucit_reset_otp_rate_limit";
@@ -72,7 +70,7 @@ function clearResetOtpRateLimitState(email: string) {
 
 function getRequestErrorMessage(err: unknown, fallbackMessage: string) {
   if (err instanceof TypeError && err.message === "Failed to fetch") {
-    return `Cannot reach backend at ${API_TARGET_LABEL}. Make sure the backend server is running and Frontend/.env uses the correct VITE_API_URL.`;
+    return `Cannot reach backend at ${API_TARGET_LABEL}. Make sure Apache proxies /api to the backend and Frontend/.env uses the correct VITE_API_URL.`;
   }
 
   return err instanceof Error ? err.message : fallbackMessage;
@@ -214,7 +212,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
 
     if (isSignUp) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/users`, {
+        const response = await fetch(getApiUrl("/api/users"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -240,7 +238,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
       }
     } else {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/login`, {
+        const response = await fetch(getApiUrl("/api/login"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -316,7 +314,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
     try {
       const supabase = getSupabaseClient();
       const response = await fetch(
-        `${API_BASE_URL}/api/password-reset/request`,
+        getApiUrl("/api/password-reset/request"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -437,7 +435,7 @@ const LoginModal: React.FC<LoginModalProps> = ({
     try {
       const supabase = getSupabaseClient();
       const response = await fetch(
-        `${API_BASE_URL}/api/password-reset/confirm`,
+        getApiUrl("/api/password-reset/confirm"),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },

@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import "../../assets/style.css";
 import { readStoredUser } from "../../utils/session";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "";
+import { getApiUrl } from "../../utils/api";
 
 function formatPredictionLabel(prediction: string) {
   if (!prediction) return "Unknown";
@@ -204,11 +203,7 @@ function HistoryPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const baseUrl = API_BASE_URL.startsWith('http') 
-        ? API_BASE_URL 
-        : `${window.location.origin}${API_BASE_URL}`;
-        
-      const url = new URL(`${baseUrl}/api/history`);
+      const url = new URL(getApiUrl("/api/history"), window.location.origin);
       if (searchQuery) {
         url.searchParams.append("q", searchQuery);
       }
@@ -238,7 +233,7 @@ function HistoryPage() {
 
   const handleDeleteHistory = async (id: number) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/history/${id}`, {
+      const response = await fetch(getApiUrl(`/api/history/${id}`), {
         method: "DELETE",
         credentials: "include"
       });
