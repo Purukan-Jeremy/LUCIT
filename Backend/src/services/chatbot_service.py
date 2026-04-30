@@ -112,7 +112,7 @@ class LLMService:
         )
 
         prompt = f"""You are an AI assistant for a histopathology analysis application.
-
+You MUST always include a "FOLLOW-UP RECOMMENDATIONS" section at the end of every response.
 Your Tasks:
 - Answer user questions based on the available analysis results.
 - Focus on interpreting the model results, confidence, and the AI description already generated.
