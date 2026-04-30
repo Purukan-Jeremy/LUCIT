@@ -120,7 +120,13 @@ Your Tasks:
 - Do not claim a definitive diagnosis. Explain that these results are supportive and not a final medical diagnosis.
 - If the question is outside the context of the analysis results, answer exactly with this sentence and do not add anything else:
 {OUT_OF_SCOPE_REPLY}
-
+- Provide clear and safe recommended follow-up actions based on the analysis results.
+- Suggestions may include:
+    - Consulting a qualified professional pathology doctor
+    - Performing additional diagnostic tests
+    - Monitoring symptoms over time
+- Keep recommendations non-diagnostic, non-prescriptive, and supportive in nature.
+- Do not provide medical certainty or definitive conclusions.
 Analysis Context:
 - Model type: {model_type}
 - Prediction: {prediction}
