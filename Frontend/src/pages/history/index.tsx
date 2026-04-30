@@ -45,6 +45,7 @@ function formatDate(value: string) {
   if (Number.isNaN(date.getTime())) return value;
 
   return new Intl.DateTimeFormat("id-ID", {
+    timeZone: "Asia/Makassar",
     day: "2-digit",
     month: "short",
     year: "numeric",
