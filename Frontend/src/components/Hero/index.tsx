@@ -9,12 +9,10 @@ function Hero() {
       return;
     }
 
-    // Get button position for the transition mask
     const rect = e.currentTarget.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
 
-    // Trigger global transition event
     window.dispatchEvent(
       new CustomEvent("lucit:start-transition", {
         detail: { x, y, target: "/analysis" },

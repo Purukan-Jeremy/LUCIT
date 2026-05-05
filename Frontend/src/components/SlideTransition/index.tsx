@@ -65,7 +65,6 @@ const SlideTransition: React.FC<SlideTransitionProps> = ({ children }) => {
       style={{
         position: "relative",
         width: "100%",
-        // FIX: Hanya hidden saat animasi agar scroll tetap berfungsi
         overflow: isAnimating ? "hidden" : "visible",
         minHeight: "100vh",
         display: "flex",

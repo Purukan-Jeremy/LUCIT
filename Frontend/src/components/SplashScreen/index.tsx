@@ -5,7 +5,6 @@ const SplashScreen: React.FC = () => {
   const [isAnimating, setIsAnimating] = useState(true);
 
   useEffect(() => {
-    // Start fading out the content
     const animationTimer = setTimeout(() => {
       setIsAnimating(false);
     }, 4300);

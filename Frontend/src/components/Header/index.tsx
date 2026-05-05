@@ -13,12 +13,12 @@ function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const [user, setUser] = useState<{ fullname: string; email: string } | null>(() =>
-    readStoredUser(),
+  const [user, setUser] = useState<{ fullname: string; email: string } | null>(
+    () => readStoredUser(),
   );
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
-  
+
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -45,14 +45,16 @@ function Header() {
   const toggleMenu = () => setIsMenuOpen((prev) => !prev);
   const closeMenu = () => setIsMenuOpen(false);
 
-  const handleLoginSuccess = (userData: { fullname: string; email: string }) => {
+  const handleLoginSuccess = (userData: {
+    fullname: string;
+    email: string;
+  }) => {
     setUser(userData);
   };
 
   const handleLogout = () => {
     setIsLoggingOut(true);
-    
-    // Simulate a brief delay for smoother transition
+
     setTimeout(() => {
       logoutUser("manual");
       setUser(null);
@@ -78,7 +80,8 @@ function Header() {
   useEffect(() => {
     const handleOpenLogin = () => setIsLoginModalOpen(true);
     window.addEventListener("lucit:open-login", handleOpenLogin);
-    return () => window.removeEventListener("lucit:open-login", handleOpenLogin);
+    return () =>
+      window.removeEventListener("lucit:open-login", handleOpenLogin);
   }, []);
 
   useEffect(() => {
@@ -87,7 +90,9 @@ function Header() {
     };
 
     const handleAuthChanged = (event: Event) => {
-      const customEvent = event as CustomEvent<{ user: { fullname: string; email: string } | null }>;
+      const customEvent = event as CustomEvent<{
+        user: { fullname: string; email: string } | null;
+      }>;
       setUser(customEvent.detail?.user ?? readStoredUser());
     };
 
@@ -100,12 +105,18 @@ function Header() {
     };
 
     window.addEventListener("storage", syncUser);
-    window.addEventListener("lucit:auth-changed", handleAuthChanged as EventListener);
+    window.addEventListener(
+      "lucit:auth-changed",
+      handleAuthChanged as EventListener,
+    );
     window.addEventListener("lucit:session-expired", handleSessionExpired);
 
     return () => {
       window.removeEventListener("storage", syncUser);
-      window.removeEventListener("lucit:auth-changed", handleAuthChanged as EventListener);
+      window.removeEventListener(
+        "lucit:auth-changed",
+        handleAuthChanged as EventListener,
+      );
       window.removeEventListener("lucit:session-expired", handleSessionExpired);
     };
   }, [navigate]);
@@ -231,9 +242,9 @@ function Header() {
         )}
       </header>
 
-      <LoginModal 
-        isOpen={isLoginModalOpen} 
-        onClose={closeLoginModal} 
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={closeLoginModal}
         onLoginSuccess={handleLoginSuccess}
       />
 
@@ -250,8 +261,12 @@ function Header() {
             <h2 id="logout-modal-title" className="logout-modal-title">
               Are you sure you want to sign out?
             </h2>
-            <p id="logout-modal-description" className="logout-modal-description">
-              You will need to sign in again to access your account and analysis history.
+            <p
+              id="logout-modal-description"
+              className="logout-modal-description"
+            >
+              You will need to sign in again to access your account and analysis
+              history.
             </p>
             <div className="logout-modal-actions">
               <button

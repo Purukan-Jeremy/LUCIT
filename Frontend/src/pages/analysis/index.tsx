@@ -80,7 +80,6 @@ const AnalysisPage: React.FC = () => {
     scrollToBottom();
   }, [chatMessages]);
 
-  // Enable mouse wheel + touchpad scrolling on dashboard-main
   useEffect(() => {
     const el = dashboardMainRef.current;
     if (!el) return;
@@ -97,7 +96,6 @@ const AnalysisPage: React.FC = () => {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
-  // Enable mouse wheel + touchpad scrolling on chatbot messages
   useEffect(() => {
     const el = chatMessagesRef.current;
     if (!el) return;

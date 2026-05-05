@@ -105,7 +105,6 @@ const DonutChart = ({
   );
 };
 
-// --- NEW COMPONENT: MEDICAL PULSE LOADER ---
 const ClinicalPulseLoader = () => {
   return (
     <div className="clinical-loader-container">

@@ -168,7 +168,6 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setResendTimer(remainingSeconds);
   }, [resetEmail, isResetMode]);
 
-  // Handle countdown timer for verification code
   useEffect(() => {
     let interval: number;
     if (resendTimer > 0) {
