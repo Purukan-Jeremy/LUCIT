@@ -19,10 +19,16 @@ def predict():
     if not current_user or not current_user.get("id"):
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
-    model_type = request.form.get("model_type", "classification")  
+    model_type = request.form.get("model_type", "classification")
+    model_name = request.form.get("model_name", "efficientnetb3")
     try:
         # Pass the user_id from session to the controller
-        result = ImageController.predict_image(file, current_user["id"], model_type=model_type)
+        result = ImageController.predict_image(
+            file,
+            current_user["id"],
+            model_type=model_type,
+            model_name=model_name,
+        )
         return jsonify(result)
     except Exception as e:
         import traceback

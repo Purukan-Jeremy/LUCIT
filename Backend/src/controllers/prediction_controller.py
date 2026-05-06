@@ -83,8 +83,9 @@ def _resolve_class_names(num_classes):
 # Pipelines
 # ──────────────────────────────────────────────
 
-def _run_classification(contents: bytes, image: Image.Image) -> dict:
-    model = load_model()
+def _run_classification(contents: bytes, image: Image.Image, model_name: str = "efficientnetb3") -> dict:
+    print(f"[Predict] Loading classification model: {model_name}")
+    model = load_model(model_name, allow_env_override=False)
     target_size = _resolve_target_size(model)
 
     resample_method = (
@@ -202,7 +203,7 @@ def _run_segmentation(contents: bytes) -> dict:
 
 class ImageController:
     @staticmethod
-    def predict_image(file, user_id, model_type="classification"):
+    def predict_image(file, user_id, model_type="classification", model_name="efficientnetb3"):
         try:
             contents = file.read()
             
@@ -216,7 +217,7 @@ class ImageController:
             if model_type == "classification":
                 print("[Predict] Running classification...")
                 image = Image.open(BytesIO(contents)).convert("RGB")
-                result = _run_classification(contents, image)
+                result = _run_classification(contents, image, model_name=model_name)
             elif model_type == "segmentation":
                 print("[Predict] Running segmentation...")
                 result = _run_segmentation(contents)
@@ -226,7 +227,20 @@ class ImageController:
             # Original image for storage
             print("[Predict] Storing result in repository...")
             original_b64 = base64.b64encode(contents).decode("utf-8")
-            return ResultRepository.store_analysis_result(user_id, result, f"data:image/jpeg;base64,{original_b64}")
+            
+            try:
+                stored_result = ResultRepository.store_analysis_result(
+                    user_id, 
+                    result, 
+                    f"data:image/jpeg;base64,{original_b64}"
+                )
+                print("[Predict] Result stored successfully")
+                return stored_result
+            except Exception as store_error:
+                print(f"[Predict] WARNING: Failed to store in database: {str(store_error)}")
+                # Return result even if storage fails
+                return result
+                
         except Exception as e:
             print(f"[Predict] CRITICAL ERROR: {str(e)}")
             import traceback

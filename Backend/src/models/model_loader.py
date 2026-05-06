@@ -5,6 +5,17 @@ import tensorflow.keras.backend as K
 
 _model_cache = {}
 
+CLASSIFICATION_MODEL_ALIASES = {
+    "efficientnetb3": "efficientnetB3_RMSprop.keras",
+    "efficientnetb3_rmsprop.keras": "efficientnetB3_RMSprop.keras",
+    "mobilenetv2": "mobilenetv2_RMSprop.keras",
+    "mobilenetv2_rmsprop.keras": "mobilenetv2_RMSprop.keras",
+    "resnet50": "ResNet50RMSNew.keras",
+    "resnet50rmsnew.keras": "ResNet50RMSNew.keras",
+    "vgg16": "VGG16_RMSprop.keras",
+    "vgg16_rmsprop.keras": "VGG16_RMSprop.keras",
+}
+
 
 # ══════════════════════════════════════════════════════════════
 # Custom objects — wajib ada agar model segmentasi bisa di-load
@@ -63,14 +74,28 @@ SEGMENTATION_CUSTOM_OBJECTS = {
 # Model loader
 # ══════════════════════════════════════════════════════════════
 
-def load_model(model_name="efficientnetB3_RMSprop.keras"):
+def _resolve_classification_model_filename(model_name):
+    raw_name = str(model_name or "").strip()
+    if not raw_name:
+        return "efficientnetB3_RMSprop.keras"
+
+    raw_lower = raw_name.lower()
+    if raw_lower in CLASSIFICATION_MODEL_ALIASES:
+        return CLASSIFICATION_MODEL_ALIASES[raw_lower]
+
+    return raw_name
+
+
+def load_model(model_name="efficientnetB3_RMSprop.keras", allow_env_override=True):
     """
     Load model Keras dan cache supaya tidak load berulang.
     Untuk model segmentasi, gunakan load_segmentation_model().
     """
     global _model_cache
 
-    if model_name not in _model_cache:
+    cache_key = model_name if model_name == "segmentation" else _resolve_classification_model_filename(model_name)
+
+    if cache_key not in _model_cache:
         # Clear session to avoid OOM or graph conflicts when loading new models
         tf.keras.backend.clear_session()
         
@@ -81,8 +106,8 @@ def load_model(model_name="efficientnetB3_RMSprop.keras"):
             env_model_path = os.getenv("SEGMENTATION_MODEL_PATH", "").strip()
             default_filename = "unet_segmentation.keras"
         else:
-            env_model_path = os.getenv("MODEL_PATH", "").strip()
-            default_filename = model_name
+            env_model_path = os.getenv("MODEL_PATH", "").strip() if allow_env_override else ""
+            default_filename = _resolve_classification_model_filename(model_name)
 
         candidate_paths = []
         if env_model_path:
@@ -90,7 +115,7 @@ def load_model(model_name="efficientnetB3_RMSprop.keras"):
         candidate_paths.append(models_dir / default_filename)
 
         # Fallback: pakai .keras pertama di folder (hanya untuk classification)
-        if not env_model_path and model_name not in ("segmentation",):
+        if allow_env_override and not env_model_path and model_name not in ("segmentation",):
             available_keras_models = sorted(models_dir.glob("*.keras"))
             if available_keras_models:
                 candidate_paths.append(available_keras_models[0])
@@ -130,10 +155,10 @@ def load_model(model_name="efficientnetB3_RMSprop.keras"):
                 compile=False
             )
 
-        _model_cache[model_name] = loaded
-        print(f"[ModelLoader] '{model_name}' loaded from: {resolved_model_path}")
+        _model_cache[cache_key] = loaded
+        print(f"[ModelLoader] '{cache_key}' loaded from: {resolved_model_path}")
 
-    return _model_cache[model_name]
+    return _model_cache[cache_key]
 
 
 def load_segmentation_model():
@@ -145,7 +170,8 @@ def clear_model_cache(model_name=None):
     """Hapus cache model. model_name=None → hapus semua."""
     global _model_cache
     if model_name:
-        _model_cache.pop(model_name, None)
+        cache_key = model_name if model_name == "segmentation" else _resolve_classification_model_filename(model_name)
+        _model_cache.pop(cache_key, None)
     else:
         _model_cache = {}
     tf.keras.backend.clear_session()
