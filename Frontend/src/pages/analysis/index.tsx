@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
 import "../../assets/style.css";
 import { hasActiveSession } from "../../utils/session";
 import { getApiUrl } from "../../utils/api";
@@ -31,10 +32,12 @@ const AnalysisPage: React.FC = () => {
   const [modelType, setModelType] = useState<
     "none" | "classification" | "segmentation"
   >("none");
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [predictionResult, setPredictionResult] = useState<{
     status?: string;
@@ -61,7 +64,7 @@ const AnalysisPage: React.FC = () => {
   } | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
-  const [_error, setError] = useState<string>("");
+  const [, setError] = useState<string>("");
   const [notice, setNotice] = useState<{
     type: "info" | "error";
     text: string;
@@ -71,6 +74,7 @@ const AnalysisPage: React.FC = () => {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const dashboardMainRef = useRef<HTMLElement | null>(null);
   const chatMessagesRef = useRef<HTMLDivElement | null>(null);
+  const markdownContentRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -81,9 +85,31 @@ const AnalysisPage: React.FC = () => {
   }, [chatMessages]);
 
   useEffect(() => {
+    if (chatOpen && isAnalyzed && chatMessages.length === 0) {
+      setChatMessages([
+        {
+          role: "assistant",
+          text: "How can i help you with the analysis results? You can ask me to explain the diagnosis, confidence level, or any specific features in the image.",
+        },
+      ]);
+    }
+  }, [chatOpen, isAnalyzed, chatMessages.length]);
+
+  // Enable mouse wheel + touchpad scrolling on dashboard-main
+  useEffect(() => {
     const el = dashboardMainRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      // Check if the scroll is happening inside a scrollable child element
+      const target = e.target as HTMLElement;
+      const isInsideScrollable = target.closest('.markdown-content, .chatbot-messages, .description-widget');
+      
+      // If inside a scrollable child, let it handle its own scroll
+      if (isInsideScrollable) {
+        e.stopPropagation();
+        return;
+      }
+      
       const { scrollTop, scrollHeight, clientHeight } = el;
       const atTop = scrollTop === 0 && e.deltaY < 0;
       const atBottom = scrollTop + clientHeight >= scrollHeight && e.deltaY > 0;
@@ -96,6 +122,34 @@ const AnalysisPage: React.FC = () => {
     return () => el.removeEventListener("wheel", onWheel);
   }, []);
 
+  // Enable mouse wheel scrolling on markdown content
+  useEffect(() => {
+    const el = markdownContentRef.current;
+    if (!el) return;
+    
+    const onWheel = (e: WheelEvent) => {
+      e.stopPropagation(); // Stop event from bubbling to parent
+      
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const atTop = scrollTop === 0 && e.deltaY < 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight && e.deltaY > 0;
+      
+      // Only prevent default if we're not at the boundaries
+      if (!atTop && !atBottom) {
+        e.preventDefault();
+        el.scrollTop += e.deltaY;
+      } else if (!atTop || !atBottom) {
+        // We're at a boundary but can still scroll in one direction
+        e.preventDefault();
+        el.scrollTop += e.deltaY;
+      }
+    };
+    
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [predictionResult]);
+
+  // Enable mouse wheel + touchpad scrolling on chatbot messages
   useEffect(() => {
     const el = chatMessagesRef.current;
     if (!el) return;
@@ -151,7 +205,7 @@ const AnalysisPage: React.FC = () => {
     if (selectedImage && !isAnalyzed) {
       processImage(selectedImage, modelType);
     }
-  }, [modelType]);
+  }, [modelType, selectedImage, isAnalyzed]);
 
   const showNotice = (type: "info" | "error", text: string) => {
     setNotice({ type, text });
@@ -202,6 +256,10 @@ const AnalysisPage: React.FC = () => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("model_type", modelType);
+    formData.append(
+      "model_name",
+      selectedModel || (modelType === "classification" ? "efficientnetb3" : "unet"),
+    );
     try {
       setIsLoading(true);
       const res = await fetch(getApiUrl("/api/predict"), {
@@ -319,6 +377,7 @@ const AnalysisPage: React.FC = () => {
     newType: "none" | "classification" | "segmentation",
   ) => {
     setModelType(newType);
+    setSelectedModel(newType === "classification" ? "efficientnetb3" : "unet");
     if (isAnalyzed) {
       setIsAnalyzed(false);
       setPredictionResult(null);
@@ -348,39 +407,254 @@ const AnalysisPage: React.FC = () => {
         <div className="bubble"></div>
       </div>
 
-      <aside className="dashboard-sidebar">
-        <div className="sidebar-section">
-          <div className="sidebar-title">Model Selection</div>
-          <select
-            className="model-dropdown"
-            value={modelType}
-            onChange={(e) => handleModelTypeChange(e.target.value as any)}
-            disabled={isLoading}
-            style={{
-              width: "100%",
-              padding: "12px",
-              borderRadius: "8px",
-              background: "#ffffff",
-              color: "#333333",
-              border: "1px solid rgba(106, 27, 154, 0.2)",
-              fontSize: "0.9rem",
-              fontWeight: 500,
-            }}
-          >
-            {modelType === "none" && (
-              <option value="none">Select Model Type</option>
+      <aside className="dashboard-sidebar" style={{ position: "relative", width: sidebarCollapsed ? "60px" : "320px", minWidth: sidebarCollapsed ? "60px" : "320px", overflow: "hidden", transition: "width 0.3s ease, min-width 0.3s ease" }}>
+        {/* ANALYSIS TYPE */}
+        <div className="sidebar-section" style={{ position: "relative", zIndex: 3 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: sidebarCollapsed ? "center" : "space-between", marginBottom: "12px" }}>
+            {!sidebarCollapsed && (
+              <div className="sidebar-title" style={{ color: "#6a1b9a", fontWeight: 600, fontSize: "0.75rem", letterSpacing: "0.5px", marginBottom: 0 }}>
+                ANALYSIS TYPE
+              </div>
             )}
-            <option value="classification">Classification Model</option>
-            <option value="segmentation">Segmentation Model</option>
-          </select>
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              style={{
+                background: "#ffffff",
+                border: "2px solid rgba(106, 27, 154, 0.2)",
+                cursor: "pointer",
+                padding: "6px 8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "6px",
+                color: "#6a1b9a",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(106, 27, 154, 0.1)";
+                e.currentTarget.style.borderColor = "#6a1b9a";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#ffffff";
+                e.currentTarget.style.borderColor = "rgba(106, 27, 154, 0.2)";
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="9" y1="3" x2="9" y2="21" />
+              </svg>
+            </button>
+          </div>
+          {!sidebarCollapsed && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <button
+                onClick={() => handleModelTypeChange("classification")}
+                disabled={isLoading}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  background: modelType === "classification" ? "#6a1b9a" : "#ffffff",
+                  color: modelType === "classification" ? "#ffffff" : "#333333",
+                  border: `2px solid ${modelType === "classification" ? "#6a1b9a" : "rgba(106, 27, 154, 0.2)"}`,
+                  fontSize: "0.9rem",
+                  fontWeight: 500,
+                  cursor: isLoading ? "not-allowed" : "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                Classification
+              </button>
+              <button
+                onClick={() => handleModelTypeChange("segmentation")}
+                disabled={isLoading}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  background: modelType === "segmentation" ? "#6a1b9a" : "#ffffff",
+                  color: modelType === "segmentation" ? "#ffffff" : "#333333",
+                  border: `2px solid ${modelType === "segmentation" ? "#6a1b9a" : "rgba(106, 27, 154, 0.2)"}`,
+                  fontSize: "0.9rem",
+                  fontWeight: 500,
+                  cursor: isLoading ? "not-allowed" : "pointer",
+                  transition: "all 0.2s",
+                }}
+              >
+                Segmentation
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="sidebar-section">
-          <div className="sidebar-title">Sample Management</div>
+        {/* MODEL SELECTION - ABSOLUTE POSITIONED */}
+        {!sidebarCollapsed && modelType !== "none" && (
+        <div 
+          className="sidebar-section" 
+          style={{ 
+            position: "absolute",
+            top: "180px",
+            left: "1.5rem",
+            right: "1.5rem",
+            transition: "opacity 0.3s",
+            zIndex: 2,
+          }}
+        >
+          <div className="sidebar-title" style={{ color: "#6a1b9a", fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", marginBottom: "8px" }}>
+            MODEL
+          </div>
+          <div style={{ 
+            background: "#ffffff", 
+            border: "2px solid rgba(106, 27, 154, 0.2)", 
+            borderRadius: "10px", 
+            padding: "8px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px"
+          }}>
+            {modelType === "classification" ? (
+              <>
+                <button
+                  onClick={() => setSelectedModel("efficientnetb3")}
+                  disabled={isLoading}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    background: selectedModel === "efficientnetb3" ? "rgba(106, 27, 154, 0.1)" : "transparent",
+                    border: `2px solid ${selectedModel === "efficientnetb3" ? "#6a1b9a" : "transparent"}`,
+                    color: "#333333",
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span>EfficientNetB3</span>
+                  <span style={{ 
+                    fontSize: "0.7rem", 
+                    background: "rgba(106, 27, 154, 0.15)", 
+                    color: "#6a1b9a", 
+                    padding: "3px 8px", 
+                    borderRadius: "4px",
+                    fontWeight: 600
+                  }}>
+                    Best Model
+                  </span>
+                </button>
+                <button
+                  onClick={() => setSelectedModel("mobilenetv2")}
+                  disabled={isLoading}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    background: selectedModel === "mobilenetv2" ? "rgba(106, 27, 154, 0.1)" : "transparent",
+                    border: `2px solid ${selectedModel === "mobilenetv2" ? "#6a1b9a" : "transparent"}`,
+                    color: "#333333",
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s",
+                    textAlign: "left",
+                  }}
+                >
+                  MobileNetV2
+                </button>
+                <button
+                  onClick={() => setSelectedModel("resnet50")}
+                  disabled={isLoading}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    background: selectedModel === "resnet50" ? "rgba(106, 27, 154, 0.1)" : "transparent",
+                    border: `2px solid ${selectedModel === "resnet50" ? "#6a1b9a" : "transparent"}`,
+                    color: "#333333",
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s",
+                    textAlign: "left",
+                  }}
+                >
+                  ResNet50
+                </button>
+                <button
+                  onClick={() => setSelectedModel("vgg16")}
+                  disabled={isLoading}
+                  style={{
+                    width: "100%",
+                    padding: "8px 10px",
+                    borderRadius: "6px",
+                    background: selectedModel === "vgg16" ? "rgba(106, 27, 154, 0.1)" : "transparent",
+                    border: `2px solid ${selectedModel === "vgg16" ? "#6a1b9a" : "transparent"}`,
+                    color: "#333333",
+                    fontSize: "0.85rem",
+                    fontWeight: 500,
+                    cursor: isLoading ? "not-allowed" : "pointer",
+                    transition: "all 0.2s",
+                    textAlign: "left",
+                  }}
+                >
+                  VGG16
+                </button>
+              </>
+            ) : modelType === "segmentation" ? (
+              <button
+                onClick={() => setSelectedModel("unet")}
+                disabled={isLoading}
+                style={{
+                  width: "100%",
+                  padding: "8px 10px",
+                  borderRadius: "6px",
+                  background: "rgba(106, 27, 154, 0.1)",
+                  border: "2px solid #6a1b9a",
+                  color: "#333333",
+                  fontSize: "0.85rem",
+                  fontWeight: 500,
+                  cursor: "default",
+                  textAlign: "left",
+                }}
+              >
+                U-Net
+              </button>
+            ) : null}
+          </div>
+        </div>
+        )}
+
+        {/* SAMPLE MANAGEMENT - ABSOLUTE POSITIONED */}
+        {!sidebarCollapsed && (
+        <div 
+          className="sidebar-section" 
+          style={{ 
+            position: "absolute",
+            bottom: "50px",
+            left: "1.5rem",
+            right: "1.5rem",
+            zIndex: 1,
+          }}
+        >
+          <div className="sidebar-title" style={{ color: "#6a1b9a", fontWeight: 600, fontSize: "0.7rem", letterSpacing: "0.5px", marginBottom: "8px" }}>
+            SAMPLE MANAGEMENT
+          </div>
           <div
             className={`mini-upload ${modelType === "none" ? "disabled" : ""}`}
             onClick={handleUploadClick}
-            style={{ background: "#ffffff" }}
+            style={{ 
+              background: "#ffffff",
+              border: "2px dashed rgba(106, 27, 154, 0.3)",
+              borderRadius: "10px",
+              padding: "16px 12px",
+              cursor: modelType === "none" ? "not-allowed" : "pointer",
+              opacity: modelType === "none" ? 0.5 : 1,
+              transition: "all 0.2s",
+              height: "110px",
+            }}
           >
             <input
               type="file"
@@ -390,80 +664,112 @@ const AnalysisPage: React.FC = () => {
               accept="image/*"
             />
             <svg
-              width="24"
-              height="24"
+              width="28"
+              height="28"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="currentColor"
+              stroke="#6a1b9a"
               strokeWidth="2"
-              style={{ marginBottom: "8px", opacity: 0.7 }}
+              style={{ marginBottom: "8px", display: "block", margin: "0 auto 8px" }}
             >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
             </svg>
             <div
               style={{
                 fontSize: "0.8rem",
-                opacity: 0.8,
+                color: "#6a1b9a",
+                fontWeight: 500,
                 wordBreak: "break-all",
                 overflowWrap: "break-word",
                 whiteSpace: "normal",
                 maxWidth: "100%",
-                padding: "0 10px",
                 textAlign: "center",
               }}
             >
               {selectedImage
                 ? selectedImage.name
-                : "Upload Histopathology Image"}
+                : "Upload Histopathology Images"}
             </div>
           </div>
         </div>
+        )}
 
-        <button
-          className="primary-btn submit-btn"
-          onClick={handleStartAnalysis}
-          disabled={isLoading || !selectedImage || modelType === "none"}
-          style={{ width: "100%", marginTop: "auto", padding: "14px" }}
-        >
-          {isLoading ? (
-            <>
-              <span className="button-spinner" /> Analyzing...
-            </>
-          ) : (
-            "Start Analyzing"
-          )}
-        </button>
-
-        {isAnalyzed && (
+        {/* BUTTONS - ABSOLUTE POSITIONED AT BOTTOM */}
+        {!sidebarCollapsed && (
+        <div style={{ position: "absolute", bottom: "1.5rem", left: "1.5rem", right: "1.5rem", zIndex: 1, display: "flex", gap: "8px", flexDirection: isAnalyzed ? "row" : "column" }}>
           <button
-            className="secondary-btn"
-            onClick={() => {
-              setIsAnalyzed(false);
-              setPredictionResult(null);
-              setSelectedImage(null);
-              setSelectedPreview("");
-              setHeatmapPreview("");
-              setOverlayPreview("");
-              setChatMessages([]);
-              setChatOpen(false);
-              setModelType("none");
-              setError("");
-            }}
-            style={{
-              width: "100%",
-              marginTop: "10px",
-              padding: "12px",
-              background: "#ffffff",
-              border: "1px solid rgba(106, 27, 154, 0.2)",
-              color: "#6a1b9a",
+            className="primary-btn submit-btn"
+            onClick={handleStartAnalysis}
+            disabled={isLoading || !selectedImage || modelType === "none"}
+            style={{ 
+              width: isAnalyzed ? "50%" : "100%",
+              height: "44px",
+              padding: "0 12px",
+              background: "#e91e63",
+              border: "none",
               borderRadius: "8px",
+              color: "#ffffff",
+              fontSize: "0.85rem",
               fontWeight: 600,
+              cursor: (isLoading || !selectedImage || modelType === "none") ? "not-allowed" : "pointer",
+              opacity: (isLoading || !selectedImage || modelType === "none") ? 0.6 : 1,
+              transition: "all 0.2s",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            New Session
+            {isLoading ? (
+              <>
+                <span className="button-spinner" /> Analyzing...
+              </>
+            ) : (
+              "Start Analyzing"
+            )}
           </button>
+
+          {isAnalyzed && (
+            <button
+              className="secondary-btn"
+              onClick={() => {
+                setIsAnalyzed(false);
+                setPredictionResult(null);
+                setSelectedImage(null);
+                setSelectedPreview("");
+                setHeatmapPreview("");
+                setOverlayPreview("");
+                setChatMessages([]);
+                setChatOpen(false);
+                setModelType("none");
+                setSelectedModel("");
+                setError("");
+              }}
+              style={{
+                width: "50%",
+                height: "44px",
+                padding: "0 12px",
+                background: "#ffffff",
+                border: "2px solid #e91e63",
+                color: "#e91e63",
+                borderRadius: "8px",
+                fontWeight: 600,
+                fontSize: "0.75rem",
+                cursor: "pointer",
+                transition: "all 0.2s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                whiteSpace: "nowrap",
+              }}
+            >
+              New Session
+            </button>
+          )}
+        </div>
         )}
       </aside>
+
+      {/* Floating Toggle Button when sidebar is collapsed - REMOVED, icon stays in sidebar */}
 
       <main
         ref={dashboardMainRef}
@@ -705,7 +1011,7 @@ const AnalysisPage: React.FC = () => {
                             >
                               {(
                                 (predictionResult.confidence || 0) * 100
-                              ).toFixed(1)}
+                              ).toFixed(2)}
                               %
                             </span>
                             <span className="donut-label">Confidence</span>
@@ -718,18 +1024,91 @@ const AnalysisPage: React.FC = () => {
                 <div className="description-widget">
                   <div
                     className="sidebar-title"
-                    style={{ marginBottom: "1rem", color: "#6a1b9a" }}
+                    style={{ 
+                      marginBottom: "1rem", 
+                      color: "#6a1b9a",
+                      position: "sticky",
+                      top: 0,
+                      background: "#ffffff",
+                      zIndex: 1,
+                      paddingBottom: "0.5rem",
+                      borderBottom: "1px solid rgba(106, 27, 154, 0.1)"
+                    }}
                   >
                     AI Narrative Insights
                   </div>
                   <div
+                    ref={markdownContentRef}
+                    className="markdown-content"
+                    data-lenis-prevent
                     style={{
-                      fontSize: "1.1rem",
-                      lineHeight: "1.7",
+                      fontSize: "0.95rem",
+                      lineHeight: "1.85",
                       color: "#333",
+                      flex: 1,
+                      overflowY: "auto",
+                      paddingRight: "10px",
                     }}
                   >
-                    {predictionResult.ai_description}
+                    <ReactMarkdown
+                      components={{
+                        h2: ({ node, ...props }) => (
+                          <h2
+                            style={{
+                              fontSize: "1.1rem",
+                              fontWeight: 600,
+                              color: "#6a1b9a",
+                              marginTop: "1.8rem",
+                              marginBottom: "0.8rem",
+                              borderBottom: "2px solid rgba(106, 27, 154, 0.1)",
+                              paddingBottom: "0.5rem",
+                            }}
+                            {...props}
+                          />
+                        ),
+                        p: ({ node, ...props }) => (
+                          <p
+                            style={{
+                              marginBottom: "1.2rem",
+                              textAlign: "justify",
+                              lineHeight: "1.85",
+                              display: "block",
+                            }}
+                            {...props}
+                          />
+                        ),
+                        ul: ({ node, ...props }) => (
+                          <ul
+                            style={{
+                              marginLeft: "1.5rem",
+                              marginBottom: "1.2rem",
+                              marginTop: "0.8rem",
+                              lineHeight: "1.8",
+                            }}
+                            {...props}
+                          />
+                        ),
+                        li: ({ node, ...props }) => (
+                          <li
+                            style={{
+                              marginBottom: "0.5rem",
+                            }}
+                            {...props}
+                          />
+                        ),
+                        strong: ({ node, ...props }) => (
+                          <strong
+                            style={{
+                              color: "#6a1b9a",
+                              fontWeight: 600,
+                            }}
+                            {...props}
+                          />
+                        ),
+                      }}
+                    >
+                      {predictionResult.ai_description}
+                    </ReactMarkdown>
                   </div>
                   <div
                     style={{
@@ -740,6 +1119,9 @@ const AnalysisPage: React.FC = () => {
                       color: "#5d4037",
                       fontSize: "0.85rem",
                       borderRadius: "4px",
+                      position: "sticky",
+                      bottom: 0,
+                      zIndex: 1,
                     }}
                   >
                     <strong>MEDICAL DISCLAIMER:</strong> For research use only.
@@ -795,6 +1177,7 @@ const AnalysisPage: React.FC = () => {
             <div
               ref={chatMessagesRef}
               className="chatbot-messages"
+              data-lenis-prevent
               style={{
                 flex: 1,
                 overflowY: "scroll",
@@ -813,19 +1196,54 @@ const AnalysisPage: React.FC = () => {
                     maxWidth: "85%",
                   }}
                 >
-                  <div
-                    style={{
-                      padding: "10px 14px",
-                      borderRadius: "12px",
-                      background: m.role === "user" ? "#e91e63" : "#ffffff",
-                      color: "#ffffff",
-                      fontSize: "0.9rem",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-                      border: "none",
-                    }}
-                  >
-                    {m.text}
-                  </div>
+                  {m.role === "assistant" ? (
+                    <ReactMarkdown
+                      components={{
+                        p: ({ node, ...props }) => (
+                          <p
+                            style={{
+                              marginBottom: "0.8rem",
+                              lineHeight: "1.6",
+                              display: "block",
+                            }}
+                            {...props}
+                          />
+                        ),
+                        ul: ({ node, ...props }) => (
+                          <ul
+                            style={{
+                              marginLeft: "1.2rem",
+                              marginBottom: "0.8rem",
+                              marginTop: "0.5rem",
+                              lineHeight: "1.6",
+                            }}
+                            {...props}
+                          />
+                        ),
+                        li: ({ node, ...props }) => (
+                          <li
+                            style={{
+                              marginBottom: "0.3rem",
+                            }}
+                            {...props}
+                          />
+                        ),
+                        strong: ({ node, ...props }) => (
+                          <strong
+                            style={{
+                              color: "#e91e63",
+                              fontWeight: 600,
+                            }}
+                            {...props}
+                          />
+                        ),
+                      }}
+                    >
+                      {m.text}
+                    </ReactMarkdown>
+                  ) : (
+                    m.text
+                  )}
                 </div>
               ))}
               <div ref={chatEndRef} />
@@ -849,6 +1267,25 @@ const AnalysisPage: React.FC = () => {
                   color: "#333",
                 }}
               />
+              <button
+                type="submit"
+                className="hx-chat-send"
+                disabled={isChatLoading || !chatInput.trim()}
+                aria-label="Send message"
+              >
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m22 2-7 20-4-9-9-4 20-7z" />
+                </svg>
+              </button>
             </form>
           </div>
         </div>

@@ -1,10 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
 import "../../assets/style.css";
 import { readStoredUser } from "../../utils/session";
 import { getApiUrl } from "../../utils/api";
+
+type ChatMessage = { role: "user" | "assistant"; text: string };
 
 function formatPredictionLabel(prediction: string) {
   if (!prediction) return "Unknown";
@@ -104,6 +107,7 @@ const DonutChart = ({
   );
 };
 
+// --- NEW COMPONENT: MEDICAL PULSE LOADER ---
 const ClinicalPulseLoader = () => {
   return (
     <div className="clinical-loader-container">
@@ -215,6 +219,22 @@ function HistoryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Chat state per history item
+  const [chatOpenId, setChatOpenId] = useState<number | null>(null);
+  const [historyChats, setHistoryChats] = useState<Record<number, ChatMessage[]>>({});
+  const [chatInputs, setChatInputs] = useState<Record<number, string>>({});
+  const [chatLoading, setChatLoading] = useState<Set<number>>(new Set());
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Drag state for chatbox — uses direct DOM for zero-lag dragging
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingRef = useRef(false);
+  const wasDraggingRef = useRef(false);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  const PANEL_W = 400;
+  const PANEL_H = 560;
+
   useEffect(() => {
     const syncUser = () => {
       try {
@@ -296,6 +316,122 @@ function HistoryPage() {
       return match ? parseFloat(match[1]) : 0;
     }
     return 0;
+  };
+
+  const openChat = (item: HistoryItem) => {
+    if (chatOpenId === item.id) {
+      setChatOpenId(null);
+      return;
+    }
+    setChatOpenId(item.id);
+    setDragPos(null); // reset to default bottom-right position
+    // Pre-load AI description as first assistant message if not already set
+    if (!historyChats[item.id]) {
+      setHistoryChats((prev) => ({
+        ...prev,
+        [item.id]: [
+          { role: "assistant" as const, text: item.description || "No AI description available." },
+        ],
+      }));
+    }
+  };
+
+  const handleHeaderMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Don't start drag on button clicks inside header
+    if ((e.target as HTMLElement).closest("button")) return;
+
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    // Snapshot current rendered position so first frame is instant
+    const rect = panel.getBoundingClientRect();
+    panel.style.left = rect.left + "px";
+    panel.style.top = rect.top + "px";
+    panel.style.right = "auto";
+    panel.style.bottom = "auto";
+
+    dragOffsetRef.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+    isDraggingRef.current = true;
+    wasDraggingRef.current = false;
+
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      wasDraggingRef.current = true;
+      const clampedX = Math.max(0, Math.min(ev.clientX - dragOffsetRef.current.x, window.innerWidth - PANEL_W));
+      const clampedY = Math.max(0, Math.min(ev.clientY - dragOffsetRef.current.y, window.innerHeight - PANEL_H));
+      // Direct DOM write — NO React re-render during drag
+      panel.style.left = clampedX + "px";
+      panel.style.top = clampedY + "px";
+    };
+
+    const onMouseUp = () => {
+      isDraggingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      // Sync final position to React state so it survives re-renders
+      const finalX = parseFloat(panel.style.left) || 0;
+      const finalY = parseFloat(panel.style.top) || 0;
+      setDragPos({ x: finalX, y: finalY });
+      setTimeout(() => { wasDraggingRef.current = false; }, 80);
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  };
+
+  const sendHistoryChat = async (item: HistoryItem) => {
+    const msg = (chatInputs[item.id] || "").trim();
+    if (!msg || chatLoading.has(item.id)) return;
+
+    const currentMessages = historyChats[item.id] || [];
+    const newMessages: ChatMessage[] = [...currentMessages, { role: "user", text: msg }];
+    setHistoryChats((prev) => ({ ...prev, [item.id]: newMessages }));
+    setChatInputs((prev) => ({ ...prev, [item.id]: "" }));
+    setChatLoading((prev) => new Set(prev).add(item.id));
+
+    try {
+      const confidenceRaw = parseConfidence(item.confidence);
+      const res = await fetch(getApiUrl("/api/chat"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          message: msg,
+          analysis_context: {
+            model_type: item.model.toLowerCase(),
+            prediction: item.prediction,
+            confidence: confidenceRaw / 100,
+            ai_description: item.description,
+          },
+          chat_history: newMessages.slice(1), // skip the AI description intro
+        }),
+      });
+      const data = await res.json();
+      const reply = data.status === "success" ? data.reply : "Error connecting to AI.";
+      setHistoryChats((prev) => ({
+        ...prev,
+        [item.id]: [...newMessages, { role: "assistant", text: reply }],
+      }));
+    } catch {
+      setHistoryChats((prev) => ({
+        ...prev,
+        [item.id]: [...newMessages, { role: "assistant", text: "Offline. Please try again." }],
+      }));
+    } finally {
+      setChatLoading((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
   };
 
   return (
@@ -500,7 +636,7 @@ function HistoryPage() {
                           <div className="detail-visuals">
                             <div className="visual-card">
                               <span className="visual-label">
-                                Feature Heatmap
+                                Binary Mask
                               </span>
                               <div className="visual-box">
                                 <img src={item.heatmapImage} alt="Heatmap" />
@@ -516,10 +652,88 @@ function HistoryPage() {
                             </div>
                           </div>
                           <div className="detail-findings">
-                            <h4 className="findings-title">
-                              Clinical Findings & AI Interpretation
-                            </h4>
-                            <p className="findings-text">{item.description}</p>
+                            <div className="findings-title-row">
+                              <h4 className="findings-title">
+                                Clinical Findings &amp; AI Interpretation
+                              </h4>
+                              <button
+                                className={`findings-chat-icon ${chatOpenId === item.id ? "active" : ""}`}
+                                title="Discuss with AI"
+                                onClick={(e) => { e.stopPropagation(); openChat(item); }}
+                              >
+                                <svg
+                                  width="20"
+                                  height="20"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                              </button>
+                            </div>
+                            <div className="findings-text markdown-content" data-lenis-prevent>
+                              <ReactMarkdown
+                                components={{
+                                  h2: ({ node, ...props }) => (
+                                    <h2
+                                      style={{
+                                        fontSize: "1rem",
+                                        fontWeight: 600,
+                                        color: "#6a1b9a",
+                                        marginTop: "1.5rem",
+                                        marginBottom: "0.7rem",
+                                        borderBottom: "2px solid rgba(106, 27, 154, 0.1)",
+                                        paddingBottom: "0.4rem",
+                                      }}
+                                      {...props}
+                                    />
+                                  ),
+                                  p: ({ node, ...props }) => (
+                                    <p
+                                      style={{
+                                        marginBottom: "1rem",
+                                        textAlign: "justify",
+                                        lineHeight: "1.8",
+                                      }}
+                                      {...props}
+                                    />
+                                  ),
+                                  ul: ({ node, ...props }) => (
+                                    <ul
+                                      style={{
+                                        marginLeft: "1.5rem",
+                                        marginBottom: "1rem",
+                                        lineHeight: "1.7",
+                                      }}
+                                      {...props}
+                                    />
+                                  ),
+                                  li: ({ node, ...props }) => (
+                                    <li
+                                      style={{
+                                        marginBottom: "0.4rem",
+                                      }}
+                                      {...props}
+                                    />
+                                  ),
+                                  strong: ({ node, ...props }) => (
+                                    <strong
+                                      style={{
+                                        color: "#6a1b9a",
+                                        fontWeight: 600,
+                                      }}
+                                      {...props}
+                                    />
+                                  ),
+                                }}
+                              >
+                                {item.description}
+                              </ReactMarkdown>
+                            </div>
                             <div className="findings-footer">
                               <div className="disclaimer-badge">
                                 AI-Generated Interpretation
@@ -577,6 +791,115 @@ function HistoryPage() {
           </div>,
           document.body,
         )}
+
+      {/* Sticky Chatbox Popup */}
+      {chatOpenId !== null && (() => {
+        const activeItem = items.find((i) => i.id === chatOpenId);
+        if (!activeItem) return null;
+        const messages = historyChats[chatOpenId] || [];
+        const isThinking = chatLoading.has(chatOpenId);
+
+        return createPortal(
+          <div className="hx-chat-wrapper">
+            {/* Backdrop — closes on click but not when user just finished dragging */}
+            <div
+              className="hx-chat-backdrop"
+              onClick={() => {
+                if (wasDraggingRef.current) return;
+                setChatOpenId(null);
+                setDragPos(null);
+              }}
+            />
+            <div
+              ref={panelRef}
+              className="hx-chat-panel"
+              style={
+                dragPos
+                  ? { left: dragPos.x, top: dragPos.y, bottom: "auto", right: "auto" }
+                  : {}
+              }
+            >
+              {/* Header — drag handle */}
+              <div
+                className="hx-chat-header"
+                onMouseDown={handleHeaderMouseDown}
+              >
+                <div className="hx-chat-header-info">
+                  <div className="hx-chat-avatar">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div className="hx-chat-title">AI Discussion</div>
+                    <div className="hx-chat-subtitle">Exam #{activeItem.id} · {activeItem.model}</div>
+                  </div>
+                </div>
+                <button className="hx-chat-close" onClick={() => setChatOpenId(null)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Pink accent bar */}
+              <div className="hx-chat-accent-bar" />
+
+              {/* Messages */}
+              <div className="hx-chat-messages" data-lenis-prevent>
+                {messages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`hx-chat-msg ${msg.role === "user" ? "hx-msg-user" : "hx-msg-assistant"}`}
+                  >
+                    <div className="hx-chat-bubble">
+                      <ReactMarkdown>{msg.text}</ReactMarkdown>
+                    </div>
+                  </div>
+                ))}
+                {isThinking && (
+                  <div className="hx-chat-msg hx-msg-assistant">
+                    <div className="hx-chat-bubble hx-thinking">
+                      <span /><span /><span />
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              <div className="hx-chat-input-row">
+                <input
+                  className="hx-chat-input"
+                  type="text"
+                  placeholder="Discuss more"
+                  value={chatInputs[chatOpenId] || ""}
+                  onChange={(e) =>
+                    setChatInputs((prev) => ({ ...prev, [chatOpenId]: e.target.value }))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendHistoryChat(activeItem);
+                    }
+                  }}
+                  disabled={isThinking}
+                />
+                <button
+                  className="hx-chat-send"
+                  onClick={() => sendHistoryChat(activeItem)}
+                  disabled={isThinking || !(chatInputs[chatOpenId] || "").trim()}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m22 2-7 20-4-9-9-4 20-7z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        );
+      })()}
     </main>
   );
 }

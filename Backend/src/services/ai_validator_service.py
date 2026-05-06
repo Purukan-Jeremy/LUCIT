@@ -2,6 +2,7 @@ from src.services.vertex_rest_client import VertexRestClient, VertexApiError
 import base64
 import json
 import hashlib
+import re
 from io import BytesIO
 import numpy as np
 from PIL import Image
@@ -11,6 +12,7 @@ from src.config.settings import GEMINI_DESCRIPTION_MODEL
 validation_cache = {}
 description_cache = {}
 segmentation_description_cache = {}  
+SEGMENTATION_DESCRIPTION_VERSION = "2026-05-05-v1"
 
 
 def _candidate_models():
@@ -100,20 +102,38 @@ def _build_local_description(prediction: str, confidence: float) -> str:
         else "the analyzed tissue"
     )
 
-    return (
-        f"Based on the model analysis results, the sample is predicted as {label} "
-        f"with a confidence level of approximately {confidence_pct:.2f}%. This finding indicates that "
-        f"the dominant visual patterns in {organ_text} are more consistent with the characteristics of that class "
-        f"compared to other classes in the same model. Generally, the morphological patterns recognized by the model "
-        f"show a risk tendency that {risk_text}, so this result can be used as an initial indicator in the clinical review process. "
-        f"A high confidence value indicates consistency of prediction on the input image, but confidence is not an absolute "
-        f"measure of diagnostic certainty as it is still influenced by specimen quality, staining variations, image artifacts, "
-        f"and the model's training data distribution. In practice, AI result interpretations should be read alongside other "
-        f"microscopic findings, patient clinical context, and relevant laboratory or supporting information so that medical "
-        f"decisions are more comprehensive. This result is supportive and does not replace a final medical diagnosis by a doctor. "
-        f"{recommendation} As a next step, consider comparative evaluation on other tissue areas, slide review by a pathologist, "
-        f"and periodic monitoring as needed according to clinical conditions."
-    )
+    return f"""## Summary
+
+The AI classification model has identified this histopathology sample as **{label}** with a confidence score of **{confidence_pct:.2f}%**. This indicates that the AI model has analyzed the tissue patterns and determined the most likely classification based on its training data. The model's prediction suggests tissue characteristics consistent with {label}.
+
+## Tissue Architecture  
+
+The dominant visual patterns in {organ_text} are more consistent with the characteristics of {label} compared to other classes in the model. The morphological patterns recognized by the model show a risk tendency that {risk_text}. The overall tissue organization and structural arrangement support this classification, providing an initial indicator for clinical review.
+
+## Cellular Characteristics
+
+The cellular features observed in this sample demonstrate patterns typical of {label}. The AI model has identified specific cellular arrangements, density patterns, and morphological characteristics that align with the predicted classification. These cellular features contribute to the overall confidence score of {confidence_pct:.2f}%.
+
+## Model Interpretation
+
+The confidence score of **{confidence_pct:.2f}%** indicates the model's certainty in this prediction based on learned patterns from training data. However, this confidence is not an absolute measure of diagnostic certainty as it is influenced by several factors including:
+
+- Specimen quality and preparation
+- Staining variations and consistency
+- Image artifacts or technical issues
+- Distribution of training data
+
+## Clinical Context
+
+In clinical practice, AI-generated results should be interpreted alongside other microscopic findings, patient clinical context, and relevant laboratory or supporting information to ensure comprehensive medical decisions. This result is supportive and does not replace a final medical diagnosis by a qualified pathologist or physician.
+
+{recommendation}
+
+**Recommended Actions:**
+- Comparative evaluation on other tissue areas
+- Slide review by a pathologist
+- Correlation with patient clinical history
+- Periodic monitoring as needed according to clinical conditions"""
 
 
 def _build_local_segmentation_description(area_stats: dict) -> str:
@@ -121,48 +141,70 @@ def _build_local_segmentation_description(area_stats: dict) -> str:
     normal_pct = float(area_stats.get("normal_percent", 100.0))
 
     if cancer_pct > 50:
-        severity_text  = "extensive cancer cells involvement"
+        severity_text  = "extensive kanker cells involvement"
         risk_text      = "high"
         recommendation = (
             "These findings are strongly recommended for immediate follow-up with "
             "a complete pathological examination and specialist consultation."
         )
     elif cancer_pct > 20:
-        severity_text  = "moderate cancer cells involvement"
+        severity_text  = "moderate kanker cells involvement"
         risk_text      = "medium to high"
         recommendation = (
             "This result should be confirmed with further histopathology "
             "examination by a specialist physician."
         )
     elif cancer_pct > 5:
-        severity_text  = "small but detected cancer cells area"
+        severity_text  = "small but detected kanker cells area"
         risk_text      = "low to medium"
         recommendation = (
             "Periodic monitoring and further clinical evaluation are recommended "
             "to confirm these findings."
         )
     else:
-        severity_text  = "minimal or non-significant cancer cells area"
+        severity_text  = "minimal or non-significant kanker cells area"
         risk_text      = "low"
         recommendation = (
             "This result still needs to be confirmed through clinical evaluation and "
             "pathology examination by a specialist physician."
         )
 
-    return (
-        f"Based on the model segmentation results, {severity_text} was found in the analyzed histopathology image. "
-        f"Approximately {cancer_pct:.2f}% of the total tissue area was identified as an area potentially containing "
-        f"cancer cells, while the remaining {normal_pct:.2f}% is tissue not marked with red color on the overlay. "
-        f"The spatial distribution pattern of the cancer area on this image shows a risk tendency that is {risk_text} "
-        f"based on the proportion of the area detected. Segmentation was performed using a U-Net based deep learning model "
-        f"that automatically identifies morphological boundaries between normal and abnormal tissue. It should be understood "
-        f"that segmentation results are influenced by specimen quality, H&E staining variation, image artifacts, and the "
-        f"threshold used in the mask binarization process. The red overlay visualization on the image shows the specific area "
-        f"identified as a region of interest by the model, which can assist pathologists in reviewing priority areas. "
-        f"This segmentation result is supportive of clinical decisions and does not replace a final medical diagnosis. "
-        f"{recommendation} As a further step, it is recommended to conduct a slide review by a pathologist and "
-        f"correlation with patient clinical data and other relevant supporting examinations."
-    )
+    return f"""## Segmentation Summary
+
+The U-Net segmentation model has analyzed this histopathology image and identified **{cancer_pct:.2f}%** of the tissue area as potentially containing kanker cells, while **{normal_pct:.2f}%** represents normal tissue. This automated analysis provides a quantitative assessment of tissue involvement.
+
+## Spatial Distribution Analysis
+
+Based on the model segmentation results, **{severity_text}** was found in the analyzed histopathology image. The spatial distribution pattern of the kanker area on this image shows a risk tendency that is **{risk_text}** based on the proportion of the area detected. The red overlay visualization on the image shows the specific area identified as a region of interest by the model, which can assist pathologists in reviewing priority areas.
+
+## Model Methodology
+
+Segmentation was performed using a U-Net based deep learning model that automatically identifies morphological boundaries between normal and abnormal tissue. It should be understood that segmentation results are influenced by:
+
+- Specimen quality
+- H&E staining variation
+- Image artifacts
+- Threshold used in the mask binarization process
+
+## Clinical Interpretation
+
+This segmentation result is supportive of clinical decisions and does not replace a final medical diagnosis. {recommendation}
+
+## Recommended Actions
+
+As a further step, it is recommended to:
+- Conduct a slide review by a pathologist
+- Correlation with patient clinical data
+- Review other relevant supporting examinations"""
+
+
+def _normalize_segmentation_description(text: str) -> str:
+    if not text:
+        return text
+
+    normalized = re.sub(r"\btumor(s)?\b", "kanker", text, flags=re.IGNORECASE)
+    normalized = re.sub(r"\bcancer(s)?\b", "kanker", normalized, flags=re.IGNORECASE)
+    return normalized
 
 
 def generate_ai_description_segmentation(
@@ -175,7 +217,7 @@ def generate_ai_description_segmentation(
 
     image_hash = hashlib.md5(image_bytes).hexdigest()
     stats_hash = hashlib.md5(json.dumps(area_stats, sort_keys=True).encode()).hexdigest()
-    cache_key  = f"seg:{image_hash}:{stats_hash}"
+    cache_key  = f"seg:{SEGMENTATION_DESCRIPTION_VERSION}:{image_hash}:{stats_hash}"
 
     if cache_key in segmentation_description_cache:
         print("Using cached AI segmentation description.")
@@ -190,26 +232,47 @@ def generate_ai_description_segmentation(
         else:
             image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
 
-        prompt = f"""You are a medical AI assistant expert in histopathology analysis and cancer segmentation.
+        prompt = f"""You are a medical AI assistant expert in histopathology analysis and kanker segmentation.
 
 I have performed automatic segmentation on a histopathology image using a U-Net model with the following results:
-- Area detected as cancer : {cancer_pct:.2f}%
+- Area detected as kanker : {cancer_pct:.2f}%
 - Area detected as normal: {normal_pct:.2f}%
-- In the overlay image, the red areas indicate regions identified as cancer by the model, while areas not marked in red represent normal tissue.
+- In the overlay image, the red areas indicate regions identified as kanker by the model, while areas not marked in red represent normal tissue.
 
 Please analyze this histopathology image (with the segmentation overlay) and provide a detailed medical description in English. \
-Include interpretations of the spatial distribution of cancer areas, observed morphological characteristics, and the level of tissue involvement. \
-Do not mention pixel counts, neoplastic, biopsy, resection, prognosis, cancer stage, metastasis, post-therapy recurrence, \
-or treatment strategy plans. \
-Answer ONLY in English, in a flowing paragraph without numbering or bullets. Total length: approximately 12-15 sentences."""
+Include interpretations of the spatial distribution of kanker areas, observed morphological characteristics, and the level of tissue involvement. \
+Do not mention pixel counts, neoplastic, biopsy, resection, prognosis, kanker stage, metastasis, post-therapy recurrence, \
+or treatment strategy plans.
+
+IMPORTANT FORMATTING REQUIREMENTS:
+- Answer ONLY in English
+- Use Markdown format with clear paragraph separation
+- Start with a "Segmentation Summary" section that states the kanker percentage and normal percentage
+- Then provide 3-4 additional sections with detailed analysis
+- Start each major section with a descriptive heading (use ## for headings)
+- Use bullet points or numbered lists where appropriate
+- Total length: approximately 12-15 sentences
+- Make it easy to read and visually structured
+
+Required structure:
+## Segmentation Summary
+[Brief summary stating the segmentation results: {cancer_pct:.2f}% kanker area and {normal_pct:.2f}% normal area]
+
+## Spatial Distribution Analysis
+[First paragraph about kanker distribution patterns]
+
+## Morphological Characteristics
+[Second paragraph about tissue features and cellular patterns]
+
+## Clinical Interpretation
+[Third paragraph about clinical significance and recommendations]"""
 
         response, used_model = _generate_with_fallback(prompt, image_base64)
 
-        description = (response.text or "").strip()
-        description = description.replace("**", "").replace("*", "").strip()
+        description = _normalize_segmentation_description((response.text or "").strip())
 
         if not description:
-            return _build_local_segmentation_description(area_stats)
+            return _normalize_segmentation_description(_build_local_segmentation_description(area_stats))
 
         print(f"AI Segmentation Description generated successfully using model: {used_model}")
         segmentation_description_cache[cache_key] = description
@@ -217,7 +280,7 @@ Answer ONLY in English, in a flowing paragraph without numbering or bullets. Tot
 
     except Exception as e:
         print(f"Error generating AI segmentation description: {str(e)}")
-        return _build_local_segmentation_description(area_stats)
+        return _normalize_segmentation_description(_build_local_segmentation_description(area_stats))
 
 
 def _heuristic_histopathology_check(image_bytes: bytes) -> dict:
@@ -304,23 +367,84 @@ def generate_ai_description(image_bytes, prediction: str, confidence: float, gra
         return description_cache[cache_key]
 
     try:
-        image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
+        if gradcam_base64:
+            image_base64 = gradcam_base64
+        else:
+            image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
 
+        confidence_pct = confidence * 100
         prompt = f"""You are a medical AI assistant expert in histopathology analysis.
 
-I have analyzed a histopathology image with the following results:
+Classification Results:
 - Prediction: {prediction}
-- Confidence: {(confidence * 100):.2f}%
+- Confidence Score: {confidence_pct:.2f}%
 
-Please analyze this histopathology image and provide a detailed medical description in English. Answer ONLY in English, in a flowing paragraph without numbering or bullets. Total length: approximately 12-15 sentences."""
+YOUR RESPONSE MUST START WITH THIS EXACT TEXT (copy this):
+
+## Summary
+
+The AI classification model has identified this histopathology sample as **{prediction}** with a confidence score of **{confidence_pct:.2f}%**.
+
+[Continue with 1-2 more sentences about what this means]
+
+---
+
+THEN continue with these sections:
+
+## Tissue Architecture
+[3-4 sentences describing tissue structure and patterns]
+
+## Cellular Characteristics  
+[3-4 sentences about cell features and morphology]
+
+## Model Interpretation
+[3-4 sentences explaining the {confidence_pct:.2f}% confidence score and AI limitations]
+
+## Clinical Context
+[3-4 sentences about clinical significance and recommendations]
+
+CRITICAL REQUIREMENTS:
+1. Your FIRST line must be: ## Summary
+2. Your SECOND line must mention {prediction} and {confidence_pct:.2f}%
+3. Use English only
+4. Use Markdown format
+5. Total 15-18 sentences
+6. Professional medical tone
+
+PROHIBITED: pixel counts, neoplastic, biopsy, resection, prognosis, cancer stage, metastasis, post-therapy recurrence, treatment plans.
+
+BEGIN YOUR RESPONSE NOW with "## Summary":"""
 
         response, used_model = _generate_with_fallback(prompt, image_base64)
         
         description = (response.text or "").strip()
-        description = description.replace("**", "").replace("*", "").strip()
 
         if not description:
+            print("AI returned empty description, using local fallback")
             return _build_local_description(prediction=prediction, confidence=confidence)
+
+        # Check if Summary section exists (case-insensitive, handle various formats)
+        has_summary = (
+            description.lower().startswith("## summary") or
+            description.lower().startswith("#summary") or
+            "## summary" in description.lower()[:100]  # Check first 100 chars
+        )
+
+        if not has_summary:
+            print(f"AI response missing Summary section. First 200 chars: {description[:200]}")
+            confidence_pct = confidence * 100
+            summary_section = (
+                "## Summary\n\n"
+                f"The AI classification model has identified this histopathology sample as **{prediction}** "
+                f"with a confidence score of **{confidence_pct:.2f}%**. "
+                f"This indicates that the model has detected tissue patterns and cellular characteristics consistent with {prediction}. "
+                f"The confidence level of {confidence_pct:.2f}% reflects the model's certainty based on learned patterns from its training data.\n\n"
+                "---\n\n"
+            )
+            description = summary_section + description
+            print("Summary section prepended to AI response")
+        else:
+            print("Summary section found in AI response")
 
         print(f"AI Description generated successfully using model: {used_model}")
         description_cache[cache_key] = description
