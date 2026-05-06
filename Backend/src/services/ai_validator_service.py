@@ -76,64 +76,64 @@ def _build_local_description(prediction: str, confidence: float) -> str:
     label_lower = label.lower()
 
     if "benign" in label_lower:
-        risk_text = "tends to be lower"
+        risk_text = "cenderung lebih rendah"
         recommendation = (
-            "This result should still be confirmed with clinical evaluation and "
-            "pathological examination by a specialist physician."
+            "Hasil ini tetap perlu dikonfirmasi dengan evaluasi klinis dan "
+            "pemeriksaan patologi oleh dokter spesialis."
         )
     elif any(word in label_lower for word in ["aca", "scc", "malignant"]):
-        risk_text = "tends to be higher"
+        risk_text = "cenderung lebih tinggi"
         recommendation = (
-            "These findings should be followed up with clinical correlation, "
-            "further pathological examination, and medical decisions by a specialist physician."
+            "Temuan ini perlu ditindaklanjuti dengan korelasi klinis, "
+            "pemeriksaan patologi lanjutan, dan keputusan medis oleh dokter spesialis."
         )
     else:
-        risk_text = "is not yet specific"
+        risk_text = "belum spesifik"
         recommendation = (
-            "Final interpretation must consider clinical data, complete "
-            "histopathology examination, and physician assessment."
+            "Interpretasi akhir harus mempertimbangkan data klinis, "
+            "pemeriksaan histopatologi lengkap, dan penilaian dokter."
         )
 
     organ_text = (
-        "lung tissue"
+        "jaringan paru"
         if "lung" in label_lower
-        else "colon tissue"
+        else "jaringan kolon"
         if "colon" in label_lower
-        else "the analyzed tissue"
+        else "jaringan yang dianalisis"
     )
 
-    return f"""## Summary
+    return f"""## Ringkasan
 
-The AI classification model has identified this histopathology sample as **{label}** with a confidence score of **{confidence_pct:.2f}%**. This indicates that the AI model has analyzed the tissue patterns and determined the most likely classification based on its training data. The model's prediction suggests tissue characteristics consistent with {label}.
+Model klasifikasi AI telah mengidentifikasi sampel histopatologi ini sebagai **{label}** dengan skor kepercayaan **{confidence_pct:.2f}%**. Ini menunjukkan bahwa model AI telah menganalisis pola jaringan dan menentukan klasifikasi yang paling mungkin berdasarkan data latihnya. Prediksi model ini mengarah pada karakteristik jaringan yang konsisten dengan {label}.
 
-## Tissue Architecture  
+## Arsitektur Jaringan
 
-The dominant visual patterns in {organ_text} are more consistent with the characteristics of {label} compared to other classes in the model. The morphological patterns recognized by the model show a risk tendency that {risk_text}. The overall tissue organization and structural arrangement support this classification, providing an initial indicator for clinical review.
+Pola visual dominan pada {organ_text} lebih sesuai dengan karakteristik {label} dibandingkan kelas lain di dalam model. Pola morfologi yang dikenali model menunjukkan kecenderungan risiko yang {risk_text}. Susunan jaringan secara keseluruhan mendukung klasifikasi ini sebagai indikator awal untuk tinjauan klinis.
 
-## Cellular Characteristics
+## Karakteristik Seluler
 
-The cellular features observed in this sample demonstrate patterns typical of {label}. The AI model has identified specific cellular arrangements, density patterns, and morphological characteristics that align with the predicted classification. These cellular features contribute to the overall confidence score of {confidence_pct:.2f}%.
+Fitur seluler yang terlihat pada sampel ini menunjukkan pola yang umum ditemukan pada {label}. Model AI telah mengenali susunan sel, pola kepadatan, dan karakteristik morfologi yang selaras dengan klasifikasi yang diprediksi. Karakteristik seluler ini berkontribusi terhadap skor kepercayaan keseluruhan sebesar {confidence_pct:.2f}%.
 
-## Model Interpretation
+## Interpretasi Model
 
-The confidence score of **{confidence_pct:.2f}%** indicates the model's certainty in this prediction based on learned patterns from training data. However, this confidence is not an absolute measure of diagnostic certainty as it is influenced by several factors including:
+Skor kepercayaan sebesar **{confidence_pct:.2f}%** menunjukkan tingkat keyakinan model terhadap prediksi ini berdasarkan pola yang dipelajari dari data latih. Namun, tingkat kepercayaan ini bukan ukuran pasti dari kepastian diagnosis karena dipengaruhi oleh beberapa faktor, termasuk:
 
-- Specimen quality and preparation
-- Staining variations and consistency
-- Image artifacts or technical issues
-- Distribution of training data
+- Kualitas dan preparasi spesimen
+- Variasi serta konsistensi pewarnaan
+- Artefak citra atau masalah teknis
+- Distribusi data latih
 
-## Clinical Context
+## Konteks Klinis
 
-In clinical practice, AI-generated results should be interpreted alongside other microscopic findings, patient clinical context, and relevant laboratory or supporting information to ensure comprehensive medical decisions. This result is supportive and does not replace a final medical diagnosis by a qualified pathologist or physician.
+Dalam praktik klinis, hasil AI sebaiknya diinterpretasikan bersama temuan mikroskopis lain, konteks klinis pasien, dan informasi laboratorium atau pendukung yang relevan agar keputusan medis lebih komprehensif. Hasil ini bersifat suportif dan tidak menggantikan diagnosis akhir oleh patolog atau dokter yang kompeten.
 
 {recommendation}
 
-**Recommended Actions:**
-- Comparative evaluation on other tissue areas
-- Slide review by a pathologist
-- Correlation with patient clinical history
-- Periodic monitoring as needed according to clinical conditions"""
+**Tindakan yang Disarankan:**
+- Evaluasi komparatif pada area jaringan lain
+- Tinjauan slide oleh patolog
+- Korelasi dengan riwayat klinis pasien
+- Pemantauan berkala sesuai kebutuhan kondisi klinis"""
 
 
 def _build_local_segmentation_description(area_stats: dict) -> str:
@@ -141,61 +141,61 @@ def _build_local_segmentation_description(area_stats: dict) -> str:
     normal_pct = float(area_stats.get("normal_percent", 100.0))
 
     if cancer_pct > 50:
-        severity_text  = "extensive kanker cells involvement"
-        risk_text      = "high"
+        severity_text  = "keterlibatan sel kanker yang luas"
+        risk_text      = "tinggi"
         recommendation = (
-            "These findings are strongly recommended for immediate follow-up with "
-            "a complete pathological examination and specialist consultation."
+            "Temuan ini sangat disarankan untuk segera ditindaklanjuti dengan "
+            "pemeriksaan patologi lengkap dan konsultasi dokter spesialis."
         )
     elif cancer_pct > 20:
-        severity_text  = "moderate kanker cells involvement"
-        risk_text      = "medium to high"
+        severity_text  = "keterlibatan sel kanker tingkat sedang"
+        risk_text      = "sedang hingga tinggi"
         recommendation = (
-            "This result should be confirmed with further histopathology "
-            "examination by a specialist physician."
+            "Hasil ini perlu dikonfirmasi dengan pemeriksaan histopatologi "
+            "lanjutan oleh dokter spesialis."
         )
     elif cancer_pct > 5:
-        severity_text  = "small but detected kanker cells area"
-        risk_text      = "low to medium"
+        severity_text  = "area sel kanker kecil namun terdeteksi"
+        risk_text      = "rendah hingga sedang"
         recommendation = (
-            "Periodic monitoring and further clinical evaluation are recommended "
-            "to confirm these findings."
+            "Pemantauan berkala dan evaluasi klinis lanjutan disarankan "
+            "untuk mengonfirmasi temuan ini."
         )
     else:
-        severity_text  = "minimal or non-significant kanker cells area"
-        risk_text      = "low"
+        severity_text  = "area sel kanker minimal atau tidak bermakna"
+        risk_text      = "rendah"
         recommendation = (
-            "This result still needs to be confirmed through clinical evaluation and "
-            "pathology examination by a specialist physician."
+            "Hasil ini tetap perlu dikonfirmasi melalui evaluasi klinis dan "
+            "pemeriksaan patologi oleh dokter spesialis."
         )
 
-    return f"""## Segmentation Summary
+    return f"""## Ringkasan Segmentasi
 
-The U-Net segmentation model has analyzed this histopathology image and identified **{cancer_pct:.2f}%** of the tissue area as potentially containing kanker cells, while **{normal_pct:.2f}%** represents normal tissue. This automated analysis provides a quantitative assessment of tissue involvement.
+Model segmentasi U-Net telah menganalisis citra histopatologi ini dan mengidentifikasi **{cancer_pct:.2f}%** area jaringan sebagai bagian yang berpotensi mengandung sel kanker, sedangkan **{normal_pct:.2f}%** merepresentasikan jaringan normal. Analisis otomatis ini memberikan penilaian kuantitatif terhadap keterlibatan jaringan.
 
-## Spatial Distribution Analysis
+## Analisis Distribusi Spasial
 
-Based on the model segmentation results, **{severity_text}** was found in the analyzed histopathology image. The spatial distribution pattern of the kanker area on this image shows a risk tendency that is **{risk_text}** based on the proportion of the area detected. The red overlay visualization on the image shows the specific area identified as a region of interest by the model, which can assist pathologists in reviewing priority areas.
+Berdasarkan hasil segmentasi model, ditemukan **{severity_text}** pada citra histopatologi yang dianalisis. Pola distribusi spasial area kanker pada citra ini menunjukkan kecenderungan risiko yang **{risk_text}** berdasarkan proporsi area yang terdeteksi. Visualisasi overlay merah pada citra menunjukkan area spesifik yang diidentifikasi model sebagai region of interest, sehingga dapat membantu patolog meninjau area prioritas.
 
-## Model Methodology
+## Metodologi Model
 
-Segmentation was performed using a U-Net based deep learning model that automatically identifies morphological boundaries between normal and abnormal tissue. It should be understood that segmentation results are influenced by:
+Segmentasi dilakukan menggunakan model deep learning berbasis U-Net yang secara otomatis mengidentifikasi batas morfologi antara jaringan normal dan abnormal. Perlu dipahami bahwa hasil segmentasi dipengaruhi oleh:
 
-- Specimen quality
-- H&E staining variation
-- Image artifacts
-- Threshold used in the mask binarization process
+- Kualitas spesimen
+- Variasi pewarnaan H&E
+- Artefak citra
+- Ambang yang digunakan dalam proses binarisasi mask
 
-## Clinical Interpretation
+## Interpretasi Klinis
 
-This segmentation result is supportive of clinical decisions and does not replace a final medical diagnosis. {recommendation}
+Hasil segmentasi ini bersifat mendukung pengambilan keputusan klinis dan tidak menggantikan diagnosis medis akhir. {recommendation}
 
-## Recommended Actions
+## Tindakan yang Disarankan
 
-As a further step, it is recommended to:
-- Conduct a slide review by a pathologist
-- Correlation with patient clinical data
-- Review other relevant supporting examinations"""
+Sebagai langkah lanjutan, disarankan untuk:
+- Melakukan tinjauan slide oleh patolog
+- Mengkorelasikan dengan data klinis pasien
+- Meninjau pemeriksaan pendukung lain yang relevan"""
 
 
 def _normalize_segmentation_description(text: str) -> str:
@@ -232,40 +232,40 @@ def generate_ai_description_segmentation(
         else:
             image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
 
-        prompt = f"""You are a medical AI assistant expert in histopathology analysis and kanker segmentation.
+        prompt = f"""Anda adalah asisten AI medis yang ahli dalam analisis histopatologi dan segmentasi kanker.
 
-I have performed automatic segmentation on a histopathology image using a U-Net model with the following results:
-- Area detected as kanker : {cancer_pct:.2f}%
-- Area detected as normal: {normal_pct:.2f}%
-- In the overlay image, the red areas indicate regions identified as kanker by the model, while areas not marked in red represent normal tissue.
+Saya telah melakukan segmentasi otomatis pada citra histopatologi menggunakan model U-Net dengan hasil berikut:
+- Area yang terdeteksi sebagai kanker: {cancer_pct:.2f}%
+- Area yang terdeteksi sebagai normal: {normal_pct:.2f}%
+- Pada gambar overlay, area merah menunjukkan region yang diidentifikasi sebagai kanker oleh model, sedangkan area yang tidak diberi warna merah merepresentasikan jaringan normal.
 
-Please analyze this histopathology image (with the segmentation overlay) and provide a detailed medical description in English. \
-Include interpretations of the spatial distribution of kanker areas, observed morphological characteristics, and the level of tissue involvement. \
-Do not mention pixel counts, neoplastic, biopsy, resection, prognosis, kanker stage, metastasis, post-therapy recurrence, \
-or treatment strategy plans.
+Silakan analisis citra histopatologi ini (dengan overlay segmentasi) dan berikan deskripsi medis yang detail dalam bahasa Indonesia. \
+Sertakan interpretasi distribusi spasial area kanker, karakteristik morfologi yang terlihat, dan tingkat keterlibatan jaringan. \
+Jangan menyebutkan jumlah piksel, neoplastik, biopsi, reseksi, prognosis, stadium kanker, metastasis, kekambuhan pascaterapi, \
+atau rencana strategi pengobatan.
 
-IMPORTANT FORMATTING REQUIREMENTS:
-- Answer ONLY in English
-- Use Markdown format with clear paragraph separation
-- Start with a "Segmentation Summary" section that states the kanker percentage and normal percentage
-- Then provide 3-4 additional sections with detailed analysis
-- Start each major section with a descriptive heading (use ## for headings)
-- Use bullet points or numbered lists where appropriate
-- Total length: approximately 12-15 sentences
-- Make it easy to read and visually structured
+PERSYARATAN PENTING:
+- Jawab HANYA dalam bahasa Indonesia
+- Gunakan format Markdown dengan pemisahan paragraf yang jelas
+- Mulai dengan bagian "Ringkasan Segmentasi" yang menyebutkan persentase kanker dan normal
+- Lalu berikan 3-4 bagian tambahan dengan analisis detail
+- Setiap bagian utama harus memiliki heading deskriptif (gunakan ## untuk heading)
+- Gunakan bullet point atau numbered list bila sesuai
+- Panjang total sekitar 12-15 kalimat
+- Buat mudah dibaca dan terstruktur secara visual
 
-Required structure:
-## Segmentation Summary
-[Brief summary stating the segmentation results: {cancer_pct:.2f}% kanker area and {normal_pct:.2f}% normal area]
+Struktur yang wajib:
+## Ringkasan Segmentasi
+[Ringkasan singkat yang menyatakan hasil segmentasi: {cancer_pct:.2f}% area kanker dan {normal_pct:.2f}% area normal]
 
-## Spatial Distribution Analysis
-[First paragraph about kanker distribution patterns]
+## Analisis Distribusi Spasial
+[Paragraf pertama tentang pola distribusi kanker]
 
-## Morphological Characteristics
-[Second paragraph about tissue features and cellular patterns]
+## Karakteristik Morfologi
+[Paragraf kedua tentang fitur jaringan dan pola seluler]
 
-## Clinical Interpretation
-[Third paragraph about clinical significance and recommendations]"""
+## Interpretasi Klinis
+[Paragraf ketiga tentang makna klinis dan rekomendasi]"""
 
         response, used_model = _generate_with_fallback(prompt, image_base64)
 
@@ -373,47 +373,47 @@ def generate_ai_description(image_bytes, prediction: str, confidence: float, gra
             image_base64 = _encode_image_for_gemini(image_bytes, max_side=768, quality=82)
 
         confidence_pct = confidence * 100
-        prompt = f"""You are a medical AI assistant expert in histopathology analysis.
+        prompt = f"""Anda adalah asisten AI medis yang ahli dalam analisis histopatologi.
 
-Classification Results:
-- Prediction: {prediction}
-- Confidence Score: {confidence_pct:.2f}%
+Hasil Klasifikasi:
+- Prediksi: {prediction}
+- Skor Kepercayaan: {confidence_pct:.2f}%
 
-YOUR RESPONSE MUST START WITH THIS EXACT TEXT (copy this):
+RESPON ANDA HARUS DIMULAI DENGAN TEKS PERSIS INI (salin apa adanya):
 
-## Summary
+## Ringkasan
 
-The AI classification model has identified this histopathology sample as **{prediction}** with a confidence score of **{confidence_pct:.2f}%**.
+Model klasifikasi AI telah mengidentifikasi sampel histopatologi ini sebagai **{prediction}** dengan skor kepercayaan **{confidence_pct:.2f}%**.
 
-[Continue with 1-2 more sentences about what this means]
+[Lanjutkan dengan 1-2 kalimat lagi tentang maknanya]
 
 ---
 
-THEN continue with these sections:
+Lalu lanjutkan dengan bagian-bagian berikut:
 
-## Tissue Architecture
-[3-4 sentences describing tissue structure and patterns]
+## Arsitektur Jaringan
+[3-4 kalimat yang menjelaskan struktur dan pola jaringan]
 
-## Cellular Characteristics  
-[3-4 sentences about cell features and morphology]
+## Karakteristik Seluler  
+[3-4 kalimat tentang fitur sel dan morfologi]
 
-## Model Interpretation
-[3-4 sentences explaining the {confidence_pct:.2f}% confidence score and AI limitations]
+## Interpretasi Model
+[3-4 kalimat yang menjelaskan skor kepercayaan {confidence_pct:.2f}% dan keterbatasan AI]
 
-## Clinical Context
-[3-4 sentences about clinical significance and recommendations]
+## Konteks Klinis
+[3-4 kalimat tentang makna klinis dan rekomendasi]
 
-CRITICAL REQUIREMENTS:
-1. Your FIRST line must be: ## Summary
-2. Your SECOND line must mention {prediction} and {confidence_pct:.2f}%
-3. Use English only
-4. Use Markdown format
-5. Total 15-18 sentences
-6. Professional medical tone
+PERSYARATAN PENTING:
+1. Baris pertama harus: ## Ringkasan
+2. Baris kedua harus menyebut {prediction} dan {confidence_pct:.2f}%
+3. Gunakan hanya bahasa Indonesia
+4. Gunakan format Markdown
+5. Total 15-18 kalimat
+6. Nada profesional medis
 
-PROHIBITED: pixel counts, neoplastic, biopsy, resection, prognosis, cancer stage, metastasis, post-therapy recurrence, treatment plans.
+LARANGAN: jumlah piksel, neoplastik, biopsi, reseksi, prognosis, stadium kanker, metastasis, kekambuhan pascaterapi, rencana pengobatan.
 
-BEGIN YOUR RESPONSE NOW with "## Summary":"""
+MULAI JAWABAN ANDA SEKARANG dengan "## Ringkasan":"""
 
         response, used_model = _generate_with_fallback(prompt, image_base64)
         
@@ -425,8 +425,10 @@ BEGIN YOUR RESPONSE NOW with "## Summary":"""
 
         # Check if Summary section exists (case-insensitive, handle various formats)
         has_summary = (
+            description.lower().startswith("## ringkasan") or
             description.lower().startswith("## summary") or
             description.lower().startswith("#summary") or
+            "## ringkasan" in description.lower()[:100] or
             "## summary" in description.lower()[:100]  # Check first 100 chars
         )
 
@@ -434,11 +436,11 @@ BEGIN YOUR RESPONSE NOW with "## Summary":"""
             print(f"AI response missing Summary section. First 200 chars: {description[:200]}")
             confidence_pct = confidence * 100
             summary_section = (
-                "## Summary\n\n"
-                f"The AI classification model has identified this histopathology sample as **{prediction}** "
-                f"with a confidence score of **{confidence_pct:.2f}%**. "
-                f"This indicates that the model has detected tissue patterns and cellular characteristics consistent with {prediction}. "
-                f"The confidence level of {confidence_pct:.2f}% reflects the model's certainty based on learned patterns from its training data.\n\n"
+                "## Ringkasan\n\n"
+                f"Model klasifikasi AI telah mengidentifikasi sampel histopatologi ini sebagai **{prediction}** "
+                f"dengan skor kepercayaan **{confidence_pct:.2f}%**. "
+                f"Ini menunjukkan bahwa model telah mendeteksi pola jaringan dan karakteristik seluler yang konsisten dengan {prediction}. "
+                f"Tingkat kepercayaan {confidence_pct:.2f}% mencerminkan keyakinan model berdasarkan pola yang dipelajari dari data latihnya.\n\n"
                 "---\n\n"
             )
             description = summary_section + description
